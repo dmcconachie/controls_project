@@ -1,1 +1,1 @@
-# controls_project
+# Needed repos## PR2 Mocap Servoinghttps://github.com/WPI-ARC/pr2_mocap_servoinggit@github.com:WPI-ARC/pr2_mocap_servoing.git## SMMAP Libraryhttps://github.com/WPI-ARC/smmapgit@github.com:WPI-ARC/smamp.git## Archie Config filesCalder will upload
