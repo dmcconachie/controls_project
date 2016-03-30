@@ -6,6 +6,8 @@ project(controls_project)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   roscpp
+  actionlib
+  pr2_controllers_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -63,10 +65,9 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   std_msgs  # Or other packages containing msgs
-# )
+ generate_messages(
+   DEPENDENCIES
+ )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -97,12 +98,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES controls_project
-#  CATKIN_DEPENDS roscpp
-#  DEPENDS system_lib
-)
+catkin_package(INCLUDE_DIRS include CATKIN_DEPENDS roscpp actionlib pr2_controllers_msgs)
 
 ###########
 ## Build ##
@@ -111,14 +107,16 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
-include_directories(
-  ${catkin_INCLUDE_DIRS}
-)
+include_directories(include ${catkin_INCLUDE_DIRS})
 
 ## Declare a C++ library
 # add_library(controls_project
 #   src/${PROJECT_NAME}/controls_project.cpp
 # )
+
+add_executable(right_arm_controller src/right_arm_controller.cpp)
+add_dependencies(right_arm_controller ${catkin_EXPORTED_TARGETS})
+target_link_libraries(right_arm_controller  ${catkin_LIBRARIES})
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
