@@ -5,10 +5,23 @@ project(controls_project)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  arc_utilities
+  control_msgs
+  geometry_msgs
   roscpp
+  rospy
+  sensor_msgs
+  std_msgs
+  trajectory_msgs
   actionlib
   pr2_controllers_msgs
+  moveit_msgs
+  moveit_core
+  moveit_ros_planning
 )
+find_package(cmake_modules REQUIRED)
+find_package(Eigen REQUIRED)
+
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -65,9 +78,10 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate added messages and services with any dependencies listed here
- generate_messages(
-   DEPENDENCIES
- )
+# generate_messages(
+#   DEPENDENCIES
+#   control_msgs#   geometry_msgs#   sensor_msgs#   std_msgs#   trajectory_msgs
+# )
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -98,7 +112,7 @@ find_package(catkin REQUIRED COMPONENTS
 ## LIBRARIES: libraries you create in this project that dependent projects also need
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
-catkin_package(INCLUDE_DIRS include CATKIN_DEPENDS roscpp actionlib pr2_controllers_msgs)
+catkin_package(INCLUDE_DIRS include CATKIN_DEPENDS arc_utilities control_msgs geometry_msgs roscpp rospy sensor_msgs std_msgs trajectory_msgs actionlib pr2_controllers_msgs moveit_msgs moveit_core moveit_ros_planning DEPENDS system_lib Eigen)
 
 ###########
 ## Build ##
@@ -107,16 +121,31 @@ catkin_package(INCLUDE_DIRS include CATKIN_DEPENDS roscpp actionlib pr2_controll
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
-include_directories(include ${catkin_INCLUDE_DIRS})
+include_directories(include ${catkin_INCLUDE_DIRS} SYSTEM ${Eigen_INCLUDE_DIRS})
 
 ## Declare a C++ library
 # add_library(controls_project
 #   src/${PROJECT_NAME}/controls_project.cpp
 # )
 
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
+set(CMAKE_CXX_FLAGS "-std=c++0x ${CMAKE_CXX_FLAGS} -O3")
+
+add_library(servoing_controller src/servoing_controller.cpp)
+add_dependencies(servoing_controller ${catkin_EXPORTED_TARGETS})
+target_link_libraries(servoing_controller ${catkin_LIBRARIES})
+
 add_executable(right_arm_controller src/right_arm_controller.cpp)
 add_dependencies(right_arm_controller ${catkin_EXPORTED_TARGETS})
 target_link_libraries(right_arm_controller  ${catkin_LIBRARIES})
+
+add_executable(cp_left_arm_controller src/cp_left_arm_controller.cpp)
+add_dependencies(cp_left_arm_controller ${catkin_EXPORTED_TARGETS})
+target_link_libraries(cp_left_arm_controller servoing_controller ${catkin_LIBRARIES})
+
+add_executable(cp_right_arm_controller src/cp_right_arm_controller.cpp)
+add_dependencies(cp_right_arm_controller ${catkin_EXPORTED_TARGETS})
+target_link_libraries(cp_right_arm_controller servoing_controller ${catkin_LIBRARIES})
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
