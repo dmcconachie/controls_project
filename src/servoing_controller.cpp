@@ -18,89 +18,13 @@
 #include <pr2_controllers_msgs/JointTrajectoryAction.h>
 #include <actionlib/client/simple_action_client.h>
 #include <arc_utilities/eigen_helpers.hpp>
+#include <arc_utilities/eigen_helpers_conversions.hpp>
 #include <arc_utilities/pretty_print.hpp>
 #include <controls_project/servoing_controller.hpp>
 
 using namespace pr2_mocap_servoing;
 
-MocapServoingController::MocapServoingController(ros::NodeHandle& nh, std::string group_name, std::string arm_pose_topic, std::string target_pose_topic, std::string arm_config_topic, std::string arm_command_action, std::string abort_service, double kp, double ki, double kd) : nh_(nh)
-{
-    // Set mode
-    mode_ = EXTERNAL_POSE;
-    // Set up an internal robot model
-    robot_model_loader::RobotModelLoader robot_model_loader("robot_description");
-    pr2_model_ = robot_model_loader.getModel();
-    pr2_kinematic_state_ = robot_model::RobotStatePtr(new robot_state::RobotState(pr2_model_));
-    pr2_kinematic_state_->setToDefaultValues();
-    pr2_kinematic_state_->update();
-    if (group_name == std::string("left_arm"))
-    {
-        side_ = LEFT;
-        pr2_arm_group_ = std::unique_ptr<robot_model::JointModelGroup>(pr2_model_->getJointModelGroup(group_name));
-        pr2_arm_link_ = std::unique_ptr<const robot_model::LinkModel>(pr2_kinematic_state_->getLinkModel(std::string("l_wrist_roll_link")));
-        pr2_torso_link_ = std::unique_ptr<const robot_model::LinkModel>(pr2_kinematic_state_->getLinkModel(std::string("torso_lift_link")));
-        // Set the joint names
-        joint_names_.resize(PR2_ARM_JOINTS);
-        joint_names_[0] = "l_shoulder_pan_joint";
-        joint_names_[1] = "l_shoulder_lift_joint";
-        joint_names_[2] = "l_upper_arm_roll_joint";
-        joint_names_[3] = "l_elbow_flex_joint";
-        joint_names_[4] = "l_forearm_roll_joint";
-        joint_names_[5] = "l_wrist_flex_joint";
-        joint_names_[6] = "l_wrist_roll_joint";
-    }
-    else if (group_name == std::string("right_arm"))
-    {
-        side_ = RIGHT;
-        pr2_arm_group_ = std::unique_ptr<robot_model::JointModelGroup>(pr2_model_->getJointModelGroup(group_name));
-        pr2_arm_link_ = std::unique_ptr<const robot_model::LinkModel>(pr2_kinematic_state_->getLinkModel(std::string("r_wrist_roll_link")));
-        pr2_torso_link_ = std::unique_ptr<const robot_model::LinkModel>(pr2_kinematic_state_->getLinkModel(std::string("torso_lift_link")));
-        // Set the joint names
-        joint_names_.resize(PR2_ARM_JOINTS);
-        joint_names_[0] = "r_shoulder_pan_joint";
-        joint_names_[1] = "r_shoulder_lift_joint";
-        joint_names_[2] = "r_upper_arm_roll_joint";
-        joint_names_[3] = "r_elbow_flex_joint";
-        joint_names_[4] = "r_forearm_roll_joint";
-        joint_names_[5] = "r_wrist_flex_joint";
-        joint_names_[6] = "r_wrist_roll_joint";
-    }
-    else
-    {
-        throw std::invalid_argument("Invalid group name");
-    }
-    // Setup topics
-    arm_pose_sub_ = nh_.subscribe(arm_pose_topic, 1, &MocapServoingController::ArmPoseCB, this);
-    target_pose_sub_ = nh_.subscribe(target_pose_topic, 1, &MocapServoingController::TargetPoseCB, this);
-    arm_config_sub_ = nh_.subscribe(arm_config_topic, 1, &MocapServoingController::ArmConfigCB, this);
-    // Setup abort service
-    abort_server_ = nh_.advertiseService(abort_service, &MocapServoingController::AbortCB, this);
-    // Setup trajectory controller interface
-    arm_client_ = std::unique_ptr<actionlib::SimpleActionClient<pr2_controllers_msgs::JointTrajectoryAction>>(new actionlib::SimpleActionClient<pr2_controllers_msgs::JointTrajectoryAction>(arm_command_action, true));
-    ROS_INFO("Waiting for arm controllers to come up...");
-    arm_client_->waitForServer();
-    // Set gains
-    kp_ = kp;
-    ki_ = ki;
-    kd_ = kd;
-    // Set max size for qdot
-    max_joint_correction_ = MAXIMUM_JOINT_CORRECTION;
-    // Set execution timestep
-    execution_timestep_ = EXECUTION_INTERVAL;
-    // Set timeout
-    watchdog_timeout_ = WATCHDOG_INTERVAL;
-    // Initialize the control variables to safe values
-    arm_pose_valid_ = false;
-    arm_config_valid_ = false;
-    target_pose_valid_ = false;
-    // Initialize the PID values to zero
-    pose_error_integral_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-    last_pose_error_ << 0.0, 0.0, 0.0, 0.0, 0.0, 0.0;
-    // Start in PAUSED mode
-    state_ = PAUSED;
-}
-
-MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::string group_name, std::string target_pose_topic, std::string arm_config_topic, std::string arm_command_action, std::string abort_service, double kp, double ki, double kd) : nh_(nh)
+MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::string group_name, std::string arm_pose_topic, std::string target_pose_topic, std::string arm_config_topic, std::string arm_command_action, std::string abort_service, double kp, double ki, double kd) : nh_(nh)
 {
     // Set mode
     mode_ = INTERNAL_POSE;
@@ -149,6 +73,8 @@ MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::strin
     // Setup topics
     target_pose_sub_ = nh_.subscribe(target_pose_topic, 1, &MocapServoingController::TargetPoseCB, this);
     arm_config_sub_ = nh_.subscribe(arm_config_topic, 1, &MocapServoingController::ArmConfigCB, this);
+
+    arm_pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>(arm_pose_topic,1, this);
     // Setup abort service
     abort_server_ = nh_.advertiseService(abort_service, &MocapServoingController::AbortCB, this);
     // Setup trajectory controller interface
@@ -226,6 +152,9 @@ void MocapServoingController::Loop()
     ros::Rate spin_rate(CONTROL_RATE);
     while (ros::ok())
     {
+        geometry_msgs::PoseStamped pose;
+        pose.pose = EigenHelpersConversions::EigenAffine3dToGeometryPose(current_arm_pose_);
+        arm_pose_pub_.publish(pose);
         // Do the next step
         if (state_ == RUNNING)
         {

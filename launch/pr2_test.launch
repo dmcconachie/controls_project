@@ -19,4 +19,6 @@
     <!-- Create the controllers for the pr2 -->
     <include file="$(find pr2_controller_configuration_gazebo)/launch/pr2_default_controllers.launch" />
 
+    <!-- node pkg="tf" type="static_transform_publisher" name="kinect_broadcaster" args="0.004 0.041 -0.032 -0.5 0.5 -0.5 0.5 kinect_vicon kinect_camera 1" / -->
+
 </launch>
