@@ -19,7 +19,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <arc_utilities/eigen_helpers.hpp>
 #include <arc_utilities/pretty_print.hpp>
-#include <controls_project/servoing_controller.hpp>
+#include "pr2_cartesian_controller/servoing_controller.hpp"
 
 using namespace pr2_mocap_servoing;
 
@@ -194,7 +194,10 @@ std::vector<double> MocapServoingController::ComputeNextStep(Pose& current_arm_p
     // Convert pose errors into cartesian velocity
     Twist pose_correction = (pose_error * kp_) + (pose_error_integral_ * ki_) + (pose_error_derivative * kd_);
     // Use the Jacobian pseudoinverse
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wconversion"
     Eigen::VectorXd joint_correction = EigenHelpers::Pinv(current_jacobian, EigenHelpers::SuggestedRcond()) * pose_correction;
+    #pragma GCC diagnostic pop
 #ifdef VERBOSE_DEBUGGING
     std::cout << "Current raw joint correction: " << joint_correction << std::endl;
 #endif

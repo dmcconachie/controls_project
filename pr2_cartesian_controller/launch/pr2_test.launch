@@ -1,6 +1,6 @@
 <launch>
     <include file="$(find gazebo_ros)/launch/empty_world.launch">
-    	<arg name="world_name" value="$(find controls_project)/worlds/controls_project.world" />
+    	<arg name="world_name" value="$(find pr2_cartesian_controller)/worlds/controls_project.world" />
         <arg name="paused" value="false"/>
         <arg name="use_sim_time" value="true"/>
         <arg name="gui" value="true"/>
@@ -14,7 +14,7 @@
     <!-- Load the urdf from the moveit files as well -->
 
     <!-- Change to archie.srdf once it is available -->
-    <param name="robot_description_semantic" textfile="$(find controls_project)/config/pr2.srdf" />
+    <param name="robot_description_semantic" textfile="$(find pr2_cartesian_controller)/config/pr2.srdf" />
 
     <!-- Create the controllers for the pr2 -->
     <include file="$(find pr2_controller_configuration_gazebo)/launch/pr2_default_controllers.launch" />

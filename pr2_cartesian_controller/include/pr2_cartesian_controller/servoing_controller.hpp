@@ -150,6 +150,7 @@ namespace pr2_mocap_servoing
 
         inline void ArmPoseWatchdogCB(const ros::TimerEvent& e)
         {
+            (void)e;
             ROS_WARN("Arm pose hasn't been updated in %f seconds - pausing execution until a new pose update received", watchdog_timeout_);
             arm_pose_valid_ = false;
             state_ = PAUSED;
@@ -193,6 +194,7 @@ namespace pr2_mocap_servoing
 
         inline void TargetPoseWatchdogCB(const ros::TimerEvent& e)
         {
+            (void)e;
             ROS_WARN("Target pose hasn't been updated in %f seconds - continuing to current target", watchdog_timeout_);
         }
 
@@ -235,6 +237,7 @@ namespace pr2_mocap_servoing
 
         inline void ArmConfigWatchdogCB(const ros::TimerEvent& e)
         {
+            (void)e;
             ROS_WARN("Arm config hasn't been updated in %f seconds - pausing execution until a new config update received", watchdog_timeout_);
             arm_config_valid_ = false;
             state_ = PAUSED;
@@ -242,6 +245,8 @@ namespace pr2_mocap_servoing
 
         inline bool AbortCB(std_srvs::Empty::Request& req, std_srvs::Empty::Response& res)
         {
+            (void)req;
+            (void)res;
             // Cancel the current pose target
             ROS_INFO("Cancelling pose target, switching to PAUSED mode");
             // Set the status
