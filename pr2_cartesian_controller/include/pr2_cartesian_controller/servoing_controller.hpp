@@ -20,7 +20,6 @@
 #include <actionlib/client/simple_action_client.h>
 #include <arc_utilities/eigen_helpers.hpp>
 #include <arc_utilities/pretty_print.hpp>
-#include "std_msgs/String.h"
 
 #define _USE_MATH_DEFINES
 #define PR2_ARM_JOINTS 7
