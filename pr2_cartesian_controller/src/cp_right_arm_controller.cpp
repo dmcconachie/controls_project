@@ -21,6 +21,7 @@ int main(int argc, char** argv)
     ROS_INFO("Starting pr2_right_arm_mocap_servoing_controller (w/o mocap)...");
     ros::NodeHandle nh;
     ros::NodeHandle nhp("~");
+    std::string arm_pose_topic;
     std::string target_pose_topic;
     std::string arm_config_topic;
     std::string arm_command_action;
@@ -29,6 +30,7 @@ int main(int argc, char** argv)
     double kp = DEFAULT_KP;
     double ki = DEFAULT_KI;
     double kd = DEFAULT_KD;
+    nhp.param(std::string("arm_pose_topic"), arm_pose_topic, std::string("/r_arm_pose_controller/pose"));
     nhp.param(std::string("target_pose_topic"), target_pose_topic, std::string("/r_arm_pose_controller/target"));
     nhp.param(std::string("arm_config_topic"), arm_config_topic, std::string("/r_arm_controller/state"));
     nhp.param(std::string("arm_command_action"), arm_command_action, std::string("/r_arm_controller/joint_trajectory_action"));
@@ -38,7 +40,7 @@ int main(int argc, char** argv)
     nhp.param(std::string("ki"), ki, DEFAULT_KI);
     nhp.param(std::string("kd"), kd, DEFAULT_KD);
     ROS_INFO("Running in INTERNAL_POSE mode");
-    pr2_mocap_servoing::MocapServoingController controller(nh, std::string("right_arm"), target_pose_topic, arm_config_topic, arm_command_action, abort_service, kp, ki, kd);
+    pr2_mocap_servoing::MocapServoingController controller(nh, std::string("right_arm"), arm_pose_topic, target_pose_topic, arm_config_topic, arm_command_action, abort_service, kp, ki, kd);
     ROS_INFO("...startup complete");
     controller.Loop();
     return 0;

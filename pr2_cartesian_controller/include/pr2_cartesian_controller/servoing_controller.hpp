@@ -20,6 +20,7 @@
 #include <actionlib/client/simple_action_client.h>
 #include <arc_utilities/eigen_helpers.hpp>
 #include <arc_utilities/pretty_print.hpp>
+#include "std_msgs/String.h"
 
 #define _USE_MATH_DEFINES
 #define PR2_ARM_JOINTS 7
@@ -114,6 +115,8 @@ namespace pr2_mocap_servoing
         ros::Subscriber arm_pose_sub_;
         ros::Subscriber target_pose_sub_;
         ros::Subscriber arm_config_sub_;
+
+        ros::Publisher arm_pose_pub_;
 
         ros::ServiceServer abort_server_;
 
@@ -329,8 +332,6 @@ namespace pr2_mocap_servoing
     public:
 
         MocapServoingController(ros::NodeHandle& nh, std::string group_name, std::string arm_pose_topic, std::string target_pose_topic, std::string arm_config_topic, std::string arm_command_action, std::string abort_service, double kp, double ki, double kd);
-
-        MocapServoingController(ros::NodeHandle &nh, std::string group_name, std::string target_pose_topic, std::string arm_config_topic, std::string arm_command_action, std::string abort_service, double kp, double ki, double kd);
 
         void Loop();
     };
