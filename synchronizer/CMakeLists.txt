@@ -130,14 +130,14 @@ include_directories(include
 )
 
 ## Declare a C++ library
-# add_library(synchronizer
-#   src/${PROJECT_NAME}/synchronizer.cpp
-# )
-
-## Add cmake target dependencies of the library
-## as an example, code may need to be generated before libraries
-## either from message generation or dynamic reconfigure
-# add_dependencies(synchronizer ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+#add_library(${PROJECT_NAME}
+#    src/synchronizer_node.cpp
+#    include/${PROJECT_NAME}/synchronizer_ros_params.hpp
+#)
+#add_dependencies(${PROJECT_NAME}
+#    ${${PROJECT_NAME}_EXPORTED_TARGETS}
+#    ${catkin_EXPORTED_TARGETS}
+#)
 
 #############################
 # Synconrizer build targets #
@@ -147,6 +147,7 @@ include_directories(include
 add_executable(${PROJECT_NAME}_node
     src/${PROJECT_NAME}_node.cpp
     include/${PROJECT_NAME}/${PROJECT_NAME}_ros_params.hpp
+    include/${PROJECT_NAME}/table_sdf.hpp
 )
 add_dependencies(${PROJECT_NAME}_node
     ${${PROJECT_NAME}_EXPORTED_TARGETS}

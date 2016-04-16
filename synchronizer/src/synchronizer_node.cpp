@@ -1,5 +1,7 @@
+#include <Eigen/StdVector> // Hack around typedef/partial spec problem in arc_utilities
 #include <boost/thread.hpp>
 #include <ros/ros.h>
+#include <ros/callback_queue.h>
 #include <tf/transform_listener.h>
 #include <actionlib/server/simple_action_server.h>
 #include <geometry_msgs/PoseStamped.h>
@@ -9,6 +11,7 @@
 #include <arc_utilities/voxel_grid.hpp>
 
 #include "synchronizer/synchronizer_ros_params.hpp"
+#include "synchronizer/table_sdf.hpp"
 
 using namespace smmap;
 using namespace controls_project;
@@ -26,6 +29,13 @@ class Syncronizer{
             , cmd_grippers_traj_goal_( nullptr )
             , gripper_names_( { "r_gripper", "l_gripper" } )
             , current_time_( 0.0 )
+            , TABLE_FRAME_NAME( GetTableTfFrameName( nh_ ) )
+            , TABLE_X_SIZE( GetTableXSize( nh_ ) )
+            , TABLE_Y_SIZE( GetTableYSize( nh_ ) )
+            , TABLE_Z_SIZE( GetTableZSize( nh_ ) )
+            , TABLE_LEG_WIDTH( GetTableLegWidth( nh_ ) )
+            , TABLE_THICKNESS( GetTableThickness( nh_ ) )
+            , table_sdf_( nh_, TABLE_FRAME_NAME, TABLE_X_SIZE, TABLE_Y_SIZE, TABLE_Z_SIZE, TABLE_LEG_WIDTH, TABLE_THICKNESS )
             , transform_listener_( nh_, ros::Duration( 20.0 ) )
         {
             // TODO: put delay in until transform_listener_ can find needed frames
@@ -94,6 +104,13 @@ class Syncronizer{
             object_current_configuration_srv_ = nh_.advertiseService(
                     GetObjectCurrentConfigurationTopic( nh_ ), &Syncronizer::getObjectCurrentConfigurationCallback, this );
 
+            // Startup the action server
+            cmd_grippers_traj_as_.start();
+
+            boost::thread spin_thread( boost::bind( &Syncronizer::spin, this, 1000 ) );
+
+            ROS_INFO( "Syncronizer ready." );
+
             while( ros::ok() )
             {
                 // Check if we've been asked to follow a trajectory
@@ -143,9 +160,25 @@ class Syncronizer{
                 usleep( (__useconds_t)(40.0*RobotInterface::DT * 1e6) );
                 current_time_ += RobotInterface::DT;
             }
+
+            spin_thread.join();
         }
 
     private:
+
+        ////////////////////////////////////////////////////////////////////////
+        // Our internal spin function
+        ////////////////////////////////////////////////////////////////////////
+
+        void spin( double loop_rate )
+        {
+            ros::NodeHandle ph("~");
+            ROS_INFO( "Starting feedback spinner" );
+            while ( ros::ok() )
+            {
+                ros::getGlobalCallbackQueue()->callAvailable( ros::WallDuration( loop_rate ) );
+            }
+        }
 
         ////////////////////////////////////////////////////////////////////////
         // Feedback 'forwarding' related functions
@@ -207,15 +240,16 @@ class Syncronizer{
         {
             res.indices.clear();
 
+            #warning "Hard coded gripper node indices here"
             // TODO: confirm these indices
             if ( req.name.compare( gripper_names_[0] ) == 0 )
             {
                 boost::mutex::scoped_lock lock( input_mtx_ );
-                res.indices.push_back( 1 );
+                res.indices.push_back( 0 );
             }
             else if ( req.name.compare( gripper_names_[1] ) == 0 )
             {
-                res.indices.push_back( 8 );
+                res.indices.push_back( GetClothNumXAxisPoints( nh_ ) - 1 );
             }
             else
             {
@@ -253,6 +287,21 @@ class Syncronizer{
                 smmap_msgs::GetGripperCollisionReport::Request& req,
                 smmap_msgs::GetGripperCollisionReport::Response& res )
         {
+            size_t num_checks = req.pose.size();
+
+            res.gripper_distance_to_obstacle.resize( num_checks );
+            res.gripper_nearest_point_to_obstacle.resize( num_checks );
+            res.obstacle_surface_normal.resize( num_checks );
+
+            for ( size_t pose_ind = 0; pose_ind < num_checks; pose_ind++ )
+            {
+                res.gripper_distance_to_obstacle[pose_ind] = table_sdf_.getDistance( req.pose[pose_ind] );
+                res.obstacle_surface_normal[pose_ind] = table_sdf_.getGradient( req.pose[pose_ind] );
+
+                #warning "Gripper nearest point to obstacle setting is incorrect"
+                // TODO: Make this something other than just the pose itself
+                res.gripper_nearest_point_to_obstacle[pose_ind] = req.pose[pose_ind].position;
+            }
             return true;
         }
 
@@ -274,19 +323,25 @@ class Syncronizer{
                 ROS_FATAL( "Unable to lookup transform from /parent_frame to /child_frame" );
                 return false;
             }
-            const Eigen::Translation3d translation(tf_transform.getOrigin().x(), tf_transform.getOrigin().y(), tf_transform.getOrigin().z());
-            const Eigen::Quaterniond rotation(tf_transform.getRotation().w(), tf_transform.getRotation().x(), tf_transform.getRotation().y(), tf_transform.getRotation().z());
+            const Eigen::Translation3d translation( tf_transform.getOrigin().x(), tf_transform.getOrigin().y(), tf_transform.getOrigin().z() );
+            const Eigen::Quaterniond rotation( tf_transform.getRotation().w(), tf_transform.getRotation().x(), tf_transform.getRotation().y(), tf_transform.getRotation().z() );
             const Eigen::Affine3d transform = translation * rotation;
 
             // TODO: confirm this math
+            // Note that I assume that the table transform is centered in the AABB of the table
             res.points.resize( TABLE_NUM_X_TICKS * TABLE_NUM_Y_TICKS );
+            const double x_offset = -TABLE_X_SIZE / 2.0;
+            const double y_offset = -TABLE_Y_SIZE / 2.0;
+            const double z_offset = TABLE_Z_SIZE / 2.0;
+            const double x_step = TABLE_X_SIZE / (double)(TABLE_NUM_X_TICKS - 1);
+            const double y_step = TABLE_Y_SIZE / (double)(TABLE_NUM_Y_TICKS - 1);
             for ( ssize_t x_ind = 0; x_ind < TABLE_NUM_X_TICKS; x_ind++ )
             {
                 for ( ssize_t y_ind = 0; y_ind < TABLE_NUM_Y_TICKS; y_ind++ )
                 {
                     res.points[x_ind * TABLE_NUM_X_TICKS + y_ind] =
                             EigenHelpersConversions::EigenVector3dToGeometryPoint(
-                                (transform * Eigen::Vector4d( (double)x_ind * TABLE_X_STEP + TABLE_X_OFFSET, (double)y_ind + TABLE_Y_STEP + TABLE_Y_OFFSET, TABLE_Z_OFFSET, 1.0) ).segment< 3 >( 0 ) );
+                                (transform * Eigen::Vector4d( (double)x_ind * x_step + x_offset, (double)y_ind * y_step + y_offset, z_offset, 1.0) ).segment< 3 >( 0 ) );
                 }
             }
 
@@ -301,7 +356,31 @@ class Syncronizer{
                 smmap_msgs::GetPointSet::Request& req,
                 smmap_msgs::GetPointSet::Response& res )
         {
+            (void)req;
 
+            const double x_axis_size = GetClothXAxisSize( nh_ );
+            const double y_axis_size = GetClothYAxisSize( nh_ );
+            const int num_x_axis_points = GetClothNumXAxisPoints( nh_ );
+            const int num_y_axis_points = GetClothNumYAxisPoints( nh_ );
+            const double x_axis_step = x_axis_size / ( num_x_axis_points - 1 );
+            const double y_axis_step = y_axis_size / ( num_y_axis_points - 1 );
+
+            res.points.clear();
+            res.points.reserve( num_x_axis_points * num_y_axis_points );
+
+            for ( int x_ind = 0; x_ind < num_x_axis_points; x_ind++ )
+            {
+                for ( int y_ind = 0; y_ind < num_y_axis_points; y_ind++ )
+                {
+                    geometry_msgs::Point p;
+                    p.x = (double)x_ind * x_axis_step;
+                    p.y = (double)y_ind * y_axis_step;
+                    p.z = 0;
+                    res.points.push_back( p );
+                }
+            }
+
+            return true;
         }
 
         bool getObjectCurrentConfigurationCallback(
@@ -347,13 +426,17 @@ class Syncronizer{
         // Note that we're going to lie about the current time, just to keep things consistent for the planner
         double current_time_;
 
-        static const int TABLE_NUM_X_TICKS = 9;
-        static const int TABLE_NUM_Y_TICKS = 9;
-        static constexpr double TABLE_X_STEP = 0.05;
-        static constexpr double TABLE_Y_STEP = 0.05;
-        static constexpr double TABLE_X_OFFSET = -0.3;
-        static constexpr double TABLE_Y_OFFSET = -0.3;
-        static constexpr double TABLE_Z_OFFSET = 1.0;
+        const std::string TABLE_FRAME_NAME;
+        const double TABLE_X_SIZE;
+        const double TABLE_Y_SIZE;
+        const double TABLE_Z_SIZE;
+        const double TABLE_LEG_WIDTH;
+        const double TABLE_THICKNESS;
+        const TableSDF table_sdf_;
+
+        // Cover points parameters
+        static const int TABLE_NUM_X_TICKS = 7;
+        static const int TABLE_NUM_Y_TICKS = 7;
 
         ////////////////////////////////////////////////////////////////////////
         // System feedback/input Objects
