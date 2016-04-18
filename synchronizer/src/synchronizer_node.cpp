@@ -37,6 +37,7 @@ class Syncronizer{
             , TABLE_THICKNESS( GetTableThickness( nh_ ) )
             , table_sdf_( nh_, TABLE_FRAME_NAME, TABLE_X_SIZE, TABLE_Y_SIZE, TABLE_Z_SIZE, TABLE_LEG_WIDTH, TABLE_THICKNESS )
             , transform_listener_( nh_, ros::Duration( 20.0 ) )
+            , cloth_config_( GetClothNumXAxisPoints( nh_ ) * GetClothNumYAxisPoints( nh_) )
         {
             // TODO: put delay in until transform_listener_ can find needed frames
 
@@ -138,6 +139,9 @@ class Syncronizer{
                 // If we have not reached the end of the current gripper trajectory, execute the next step
                 if ( cmd_grippers_traj_as_.isActive() )
                 {
+                    // Command the grippers to move
+                    sendGrippersTrajectory();
+
                     // Advance the sim time and record the sim state
                     smmap_msgs::SimulatorFeedback msg = createSystemFbk();
 
@@ -184,6 +188,35 @@ class Syncronizer{
         // Feedback 'forwarding' related functions
         ////////////////////////////////////////////////////////////////////////
 
+        void sendGrippersTrajectory()
+        {
+            assert( cmd_grippers_traj_goal_ != nullptr );
+            assert( cmd_grippers_traj_goal_->trajectory.size() > 0 );
+            assert( cmd_grippers_traj_next_index_ < cmd_grippers_traj_goal_->trajectory.size() );
+            assert( cmd_grippers_traj_goal_->gripper_names.size() == 2 );
+
+            assert( gripper_names_[0].compare( cmd_grippers_traj_goal_->gripper_names[0] ) == 0 );
+            assert( gripper_names_[1].compare( cmd_grippers_traj_goal_->gripper_names[1] ) == 0 );
+
+            // Right gripper
+            {
+                geometry_msgs::PoseStamped r_gripper_pose;
+                r_gripper_pose.header.frame_id = "world_frame";
+                r_gripper_pose.pose = cmd_grippers_traj_goal_->trajectory[cmd_grippers_traj_next_index_].pose[0];
+                r_gripper_cmd_pub_.publish( r_gripper_pose );
+            }
+
+            // Left gripper
+            {
+                geometry_msgs::PoseStamped l_gripper_pose;
+                l_gripper_pose.header.frame_id = "world_frame";
+                l_gripper_pose.pose = cmd_grippers_traj_goal_->trajectory[cmd_grippers_traj_next_index_].pose[1];
+                l_gripper_cmd_pub_.publish( l_gripper_pose );
+            }
+
+            cmd_grippers_traj_next_index_++;
+        }
+
         void rightGripperPoseCallback( const geometry_msgs::PoseStamped::ConstPtr& pose )
         {
             boost::mutex::scoped_lock lock( input_mtx_ );
@@ -214,7 +247,17 @@ class Syncronizer{
             msg.gripper_poses.push_back( r_gripper_pose_ );
             msg.gripper_poses.push_back( l_gripper_pose_ );
 
-            // TODO: fill out gripper collision data
+            // Right Gripper
+            msg.gripper_distance_to_obstacle.push_back( table_sdf_.getDistance( r_gripper_pose_ ) );
+            msg.obstacle_surface_normal.push_back( table_sdf_.getGradient( r_gripper_pose_ ) );
+            // TODO: Make this something other than just the pose itself
+            msg.gripper_nearest_point_to_obstacle.push_back( r_gripper_pose_.position );
+
+            // Left Gripper
+            msg.gripper_distance_to_obstacle.push_back( table_sdf_.getDistance( l_gripper_pose_ ) );
+            msg.obstacle_surface_normal.push_back( table_sdf_.getGradient( l_gripper_pose_ ) );
+            // TODO: Make this something other than just the pose itself
+            msg.gripper_nearest_point_to_obstacle.push_back( l_gripper_pose_.position );
 
             msg.sim_time = current_time_;
 
@@ -320,8 +363,8 @@ class Syncronizer{
             catch ( tf::TransformException ex )
             {
                 (void)ex;
-                ROS_FATAL( "Unable to lookup transform from /parent_frame to /child_frame" );
-                return false;
+                ROS_ERROR( "Unable to lookup transform from /parent_frame to /child_frame" );
+//                return false;
             }
             const Eigen::Translation3d translation( tf_transform.getOrigin().x(), tf_transform.getOrigin().y(), tf_transform.getOrigin().z() );
             const Eigen::Quaterniond rotation( tf_transform.getRotation().w(), tf_transform.getRotation().x(), tf_transform.getRotation().y(), tf_transform.getRotation().z() );
@@ -439,7 +482,7 @@ class Syncronizer{
         static const int TABLE_NUM_Y_TICKS = 7;
 
         ////////////////////////////////////////////////////////////////////////
-        // System feedback/input Objects
+        // System passthrough/feedback objects
         ////////////////////////////////////////////////////////////////////////
 
         boost::mutex input_mtx_;
