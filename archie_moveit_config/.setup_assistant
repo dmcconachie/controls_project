@@ -1,0 +1,8 @@
+moveit_setup_assistant_config:
+  URDF:
+    package: ""
+    relative_path: /home/calderpg/Dropbox/archie_urdf.xml
+  SRDF:
+    relative_path: config/pr2.srdf
+  CONFIG:
+    generated_timestamp: 1403041131
