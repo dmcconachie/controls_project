@@ -1,13 +1,12 @@
-#include <Eigen/StdVector> // Hack around typedef/partial spec problem in arc_utilities
+#include <Eigen/StdVector> // Hack around typedef/partial spec problem in arc_utilities/sdf_tools
 #include <boost/thread.hpp>
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
 #include <tf/transform_listener.h>
 #include <actionlib/server/simple_action_server.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <smmap_experiment_params/ros_params.hpp>
 #include <smmap_msgs/messages.h>
-#include <smmap/ros_params.hpp>
-#include <smmap/robot_interface.hpp>
 #include <arc_utilities/voxel_grid.hpp>
 
 #include "synchronizer/synchronizer_ros_params.hpp"
@@ -29,15 +28,16 @@ class Syncronizer{
             , cmd_grippers_traj_goal_( nullptr )
             , gripper_names_( { "r_gripper", "l_gripper" } )
             , current_time_( 0.0 )
-            , TABLE_FRAME_NAME( GetTableTfFrameName( nh_ ) )
-            , TABLE_X_SIZE( GetTableXSize( nh_ ) )
-            , TABLE_Y_SIZE( GetTableYSize( nh_ ) )
-            , TABLE_Z_SIZE( GetTableZSize( nh_ ) )
-            , TABLE_LEG_WIDTH( GetTableLegWidth( nh_ ) )
-            , TABLE_THICKNESS( GetTableThickness( nh_ ) )
-            , table_sdf_( nh_, TABLE_FRAME_NAME, TABLE_X_SIZE, TABLE_Y_SIZE, TABLE_Z_SIZE, TABLE_LEG_WIDTH, TABLE_THICKNESS )
+            , table_frame_name_( GetTableTfFrameName( nh_ ) )
+            , table_x_size_( GetTableSizeX( nh_ ) )
+            , table_y_size_( GetTableSizeY( nh_ ) )
+            , table_z_size_( GetTableSizeZ( nh_ ) )
+            , table_leg_width_( GetTableLegWidth( nh_ ) )
+            , table_thickness_( GetTableThickness( nh_ ) )
+            , table_sdf_( nh_, table_frame_name_, table_x_size_, table_y_size_, table_z_size_, table_leg_width_, table_thickness_ )
             , transform_listener_( nh_, ros::Duration( 20.0 ) )
             , cloth_config_( GetClothNumXAxisPoints( nh_ ) * GetClothNumYAxisPoints( nh_) )
+            , actual_control_rate_( 40.0 * GetRobotControlRate( nh_ ) )
         {
             // TODO: put delay in until transform_listener_ can find needed frames
 
@@ -96,9 +96,6 @@ class Syncronizer{
 
 
 
-        /**
-         * @brief run
-         */
         void run()
         {
             // Create a service to let others know the object current configuration
@@ -161,8 +158,8 @@ class Syncronizer{
                     }
                 }
 
-                usleep( (__useconds_t)(40.0*RobotInterface::DT * 1e6) );
-                current_time_ += RobotInterface::DT;
+                usleep( (__useconds_t)( actual_control_rate_ * 1e6 ) );
+                current_time_ += actual_control_rate_;
             }
 
             spin_thread.join();
@@ -373,11 +370,11 @@ class Syncronizer{
             // TODO: confirm this math
             // Note that I assume that the table transform is centered in the AABB of the table
             res.points.resize( TABLE_NUM_X_TICKS * TABLE_NUM_Y_TICKS );
-            const double x_offset = -TABLE_X_SIZE / 2.0;
-            const double y_offset = -TABLE_Y_SIZE / 2.0;
-            const double z_offset = TABLE_Z_SIZE / 2.0;
-            const double x_step = TABLE_X_SIZE / (double)(TABLE_NUM_X_TICKS - 1);
-            const double y_step = TABLE_Y_SIZE / (double)(TABLE_NUM_Y_TICKS - 1);
+            const double x_offset = -table_x_size_ / 2.0;
+            const double y_offset = -table_y_size_ / 2.0;
+            const double z_offset = table_z_size_ / 2.0;
+            const double x_step = table_x_size_ / (double)(TABLE_NUM_X_TICKS - 1);
+            const double y_step = table_y_size_ / (double)(TABLE_NUM_Y_TICKS - 1);
             for ( ssize_t x_ind = 0; x_ind < TABLE_NUM_X_TICKS; x_ind++ )
             {
                 for ( ssize_t y_ind = 0; y_ind < TABLE_NUM_Y_TICKS; y_ind++ )
@@ -469,12 +466,12 @@ class Syncronizer{
         // Note that we're going to lie about the current time, just to keep things consistent for the planner
         double current_time_;
 
-        const std::string TABLE_FRAME_NAME;
-        const double TABLE_X_SIZE;
-        const double TABLE_Y_SIZE;
-        const double TABLE_Z_SIZE;
-        const double TABLE_LEG_WIDTH;
-        const double TABLE_THICKNESS;
+        const std::string table_frame_name_;
+        const double table_x_size_;
+        const double table_y_size_;
+        const double table_z_size_;
+        const double table_leg_width_;
+        const double table_thickness_;
         const TableSDF table_sdf_;
 
         // Cover points parameters
@@ -496,6 +493,8 @@ class Syncronizer{
 
         ros::Subscriber cloth_tracking_sub_;
         std::vector< geometry_msgs::Point > cloth_config_;
+
+        const double actual_control_rate_;
 };
 
 

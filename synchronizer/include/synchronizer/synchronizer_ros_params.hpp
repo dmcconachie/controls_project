@@ -1,9 +1,9 @@
 #ifndef CONTROLS_PROJECT_ROS_PARAMS_HPP
 #define CONTROLS_PROJECT_ROS_PARAMS_HPP
 
+#include <exception>
 #include <string>
 #include <arc_utilities/ros_helpers.hpp>
-#include <exception>
 
 
 namespace controls_project
@@ -44,35 +44,6 @@ namespace controls_project
     inline std::string GetTableTfFrameName( ros::NodeHandle& nh )
     {
         return ROSHelpers::GetParam< std::string >( nh, "table_tf_frame_name", "table_frame" );
-    }
-
-    ////////////////////////////////////////////////////////////////////////////
-    // Table Size Settings
-    ////////////////////////////////////////////////////////////////////////////
-
-    inline double GetTableXSize( ros::NodeHandle& nh )
-    {
-        return ROSHelpers::GetParam( nh, "table_x_size", 0.5 );
-    }
-
-    inline double GetTableYSize( ros::NodeHandle& nh )
-    {
-        return ROSHelpers::GetParam( nh, "table_y_size", 0.5 );
-    }
-
-    inline double GetTableZSize( ros::NodeHandle& nh )
-    {
-        return ROSHelpers::GetParam( nh, "table_z_size", 1.0 );
-    }
-
-    inline double GetTableLegWidth( ros::NodeHandle& nh )
-    {
-        return ROSHelpers::GetParam( nh, "table_leg_width", 0.05 );
-    }
-
-    inline double GetTableThickness( ros::NodeHandle& nh )
-    {
-        return ROSHelpers::GetParam( nh, "table_thickness", 0.05 );
     }
 
     ////////////////////////////////////////////////////////////////////////////

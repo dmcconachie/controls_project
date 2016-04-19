@@ -5,7 +5,7 @@ set(CATKIN_PACKAGES
     arc_utilities
     roscpp
     sdf_tools
-    smmap
+    smmap_experiment_params
     smmap_msgs
     tf
 )
