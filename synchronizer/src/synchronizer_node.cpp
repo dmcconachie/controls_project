@@ -37,7 +37,7 @@ class Syncronizer{
             , table_sdf_( nh_, table_frame_name_, table_x_size_, table_y_size_, table_z_size_, table_leg_width_, table_thickness_ )
             , transform_listener_( nh_, ros::Duration( 20.0 ) )
             , cloth_config_( GetClothNumXAxisPoints( nh_ ) * GetClothNumYAxisPoints( nh_) )
-            , actual_control_rate_( 40.0 * GetRobotControlRate( nh_ ) )
+            , actual_control_rate_( 40.0 * GetRobotControlPeriod( nh_ ) )
         {
             // TODO: put delay in until transform_listener_ can find needed frames
 
