@@ -47,7 +47,7 @@ namespace controls_project
     }
 
     ////////////////////////////////////////////////////////////////////////////
-    // Cloth Size Settings
+    // Cloth Size Settings - Get rid of these, pull from smmap_experiment params
     ////////////////////////////////////////////////////////////////////////////
 
     inline double GetClothXAxisSize( ros::NodeHandle& nh )

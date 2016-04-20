@@ -1,5 +1,7 @@
+#include <mutex>
+#include <thread>
+
 #include <Eigen/StdVector> // Hack around typedef/partial spec problem in arc_utilities/sdf_tools
-#include <boost/thread.hpp>
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
 #include <tf/transform_listener.h>
@@ -17,11 +19,9 @@ using namespace controls_project;
 
 
 
-class Syncronizer{
+class Syncronizer
+{
     public:
-        /**
-         * @brief Syncronizer
-         */
         Syncronizer()
             : nh_( "" )
             , cmd_grippers_traj_as_( nh_, GetCommandGripperTrajTopic( nh_ ), false )
@@ -105,7 +105,7 @@ class Syncronizer{
             // Startup the action server
             cmd_grippers_traj_as_.start();
 
-            boost::thread spin_thread( boost::bind( &Syncronizer::spin, this, 1000 ) );
+            std::thread spin_thread( &Syncronizer::spin, this, 1000 );
 
             ROS_INFO( "Syncronizer ready." );
 
@@ -216,25 +216,25 @@ class Syncronizer{
 
         void rightGripperPoseCallback( const geometry_msgs::PoseStamped::ConstPtr& pose )
         {
-            boost::mutex::scoped_lock lock( input_mtx_ );
+            std::lock_guard< std::mutex > lock( input_mtx_ );
             r_gripper_pose_ = pose->pose;
         }
 
         void leftGripperPoseCallback( const geometry_msgs::PoseStamped::ConstPtr& pose )
         {
-            boost::mutex::scoped_lock lock( input_mtx_ );
+            std::lock_guard< std::mutex > lock( input_mtx_ );
             l_gripper_pose_ = pose->pose;
         }
 
         void clothPointCloudCallback( const smmap_msgs::PointCloud::ConstPtr& point_cloud )
         {
-            boost::mutex::scoped_lock lock( input_mtx_ );
+            std::lock_guard< std::mutex > lock( input_mtx_ );
             cloth_config_ = point_cloud->point_cloud;
         }
 
         smmap_msgs::SimulatorFeedback createSystemFbk()
         {
-            boost::mutex::scoped_lock lock( input_mtx_ );
+            std::lock_guard< std::mutex > lock( input_mtx_ );
 
             smmap_msgs::SimulatorFeedback msg;
             msg.object_configuration = cloth_config_;
@@ -284,7 +284,7 @@ class Syncronizer{
             // TODO: confirm these indices
             if ( req.name.compare( gripper_names_[0] ) == 0 )
             {
-                boost::mutex::scoped_lock lock( input_mtx_ );
+                std::lock_guard< std::mutex > lock( input_mtx_ );
                 res.indices.push_back( 0 );
             }
             else if ( req.name.compare( gripper_names_[1] ) == 0 )
@@ -306,12 +306,12 @@ class Syncronizer{
         {
             if ( req.name.compare( gripper_names_[0] ) == 0 )
             {
-                boost::mutex::scoped_lock lock( input_mtx_ );
+                std::lock_guard< std::mutex > lock( input_mtx_ );
                 res.pose = r_gripper_pose_;
             }
             else if ( req.name.compare( gripper_names_[1] ) == 0 )
             {
-                boost::mutex::scoped_lock lock( input_mtx_ );
+                std::lock_guard< std::mutex > lock( input_mtx_ );
                 res.pose = l_gripper_pose_;
             }
             else
@@ -428,7 +428,7 @@ class Syncronizer{
                 smmap_msgs::GetPointSet::Response& res )
         {
             (void)req;
-            boost::mutex::scoped_lock lock( input_mtx_ );
+            std::lock_guard< std::mutex > lock( input_mtx_ );
             res.points = cloth_config_;
             return true;
         }
@@ -482,7 +482,7 @@ class Syncronizer{
         // System passthrough/feedback objects
         ////////////////////////////////////////////////////////////////////////
 
-        boost::mutex input_mtx_;
+        std::mutex input_mtx_;
 
         tf::TransformListener transform_listener_;
 

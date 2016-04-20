@@ -135,7 +135,7 @@ namespace controls_project
                     visualization_msgs::Marker sdf_marker = sdf_.ExportForDisplay( alpha );
                     sdf_marker.ns = "sdf";
                     sdf_marker.id = 1;
-//                    visualization_pub_.publish( sdf_marker );
+                    visualization_pub_.publish( sdf_marker );
                 }
             }
 
@@ -190,10 +190,10 @@ namespace controls_project
             ////////////////////////////////////////////////////////////////////
 
             // Define the size of the grid
-            static constexpr double GRID_RESOLUTION = 0.02; // METERS
-            static constexpr double GRID_X_SIZE = 1.0;      // METERS
-            static constexpr double GRID_Y_SIZE = 1.0;      // METERS
-            static constexpr double GRID_Z_SIZE = 1.5;      // METERS
+            static constexpr double GRID_RESOLUTION = 0.20; // METERS
+            static constexpr double GRID_X_SIZE = 4.5;      // METERS
+            static constexpr double GRID_Y_SIZE = 4.5;      // METERS
+            static constexpr double GRID_Z_SIZE = 3.0;      // METERS
 
             sdf_tools::SignedDistanceField sdf_;
 

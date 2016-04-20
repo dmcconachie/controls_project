@@ -18,7 +18,6 @@ find_package(catkin REQUIRED COMPONENTS ${CATKIN_PACKAGES})
 ## System dependencies are found with CMake's conventions
 find_package(cmake_modules REQUIRED)
 find_package(Eigen REQUIRED)
-find_package(Boost REQUIRED COMPONENTS thread)
 
 
 ## Uncomment this if the package has a setup.py. This macro ensures
