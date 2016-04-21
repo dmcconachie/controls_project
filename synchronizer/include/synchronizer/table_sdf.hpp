@@ -25,8 +25,8 @@ namespace controls_project
             {
                 {
                     const bool latch = true;
-                    visualization_pub_ = nh_.advertise< visualization_msgs::Marker >(
-                                "table_marker", 10, latch );
+                    visualization_pub_ = nh_.advertise< visualization_msgs::MarkerArray >(
+                                "table_marker_array", 10, latch );
                 }
 
                 ////////////////////////////////////////////////////////////////
@@ -96,47 +96,47 @@ namespace controls_project
                                       table_leg_width,
                                       table_z_size );
 
-                // Publish the Collision map so that it can be viewed in RViz or similar
-                {
-                    std_msgs::ColorRGBA collision_color;
-                    collision_color.r = 0.0;
-                    collision_color.g = 0.0;
-                    collision_color.b = 1.0;
-                    collision_color.a = 1.0;
-                    std_msgs::ColorRGBA free_color;
-                    free_color.r = 0.0;
-                    free_color.g = 1.0;
-                    free_color.b = 0.0;
-                    free_color.a = 0.0;
-                    std_msgs::ColorRGBA unknown_color;
-                    unknown_color.r = 1.0;
-                    unknown_color.g = 1.0;
-                    unknown_color.b = 0.0;
-                    unknown_color.a = 0.0;
-                    visualization_msgs::Marker collision_map_marker = collision_map.ExportForDisplay(
-                                collision_color, free_color, unknown_color );
-                    collision_map_marker.ns = "collision_map";
-                    collision_map_marker.id = 1;
-                    visualization_pub_.publish( collision_map_marker );
-                }
+                // Create a Collision map marker so that it can be published later
+                std_msgs::ColorRGBA collision_color;
+                collision_color.r = 0.0;
+                collision_color.g = 0.0;
+                collision_color.b = 1.0;
+                collision_color.a = 1.0;
+                std_msgs::ColorRGBA free_color;
+                free_color.r = 0.0;
+                free_color.g = 1.0;
+                free_color.b = 0.0;
+                free_color.a = 0.0;
+                std_msgs::ColorRGBA unknown_color;
+                unknown_color.r = 1.0;
+                unknown_color.g = 1.0;
+                unknown_color.b = 0.0;
+                unknown_color.a = 0.0;
+                visualization_msgs::Marker collision_map_marker = collision_map.ExportForDisplay(
+                            collision_color, free_color, unknown_color );
+                collision_map_marker.ns = "collision_map";
+                collision_map_marker.id = 1;
 
+                ////////////////////////////////////////////////////////////////
                 // Convert the collision map into an SDF
-                {
-                    // We pick a reasonable out-of-bounds value
-                    const float oob_value = std::numeric_limits< float >::infinity();
-                    // We start by extracting the SDF from the CollisionMap
-                    sdf_ = collision_map.ExtractSignedDistanceField( oob_value ).first;
-                    sdf_.Lock();
-                }
+                ////////////////////////////////////////////////////////////////
 
-                // Let's display the results to Rviz
-                {
-                    const double alpha = 0.5;
-                    visualization_msgs::Marker sdf_marker = sdf_.ExportForDisplay( alpha );
-                    sdf_marker.ns = "sdf";
-                    sdf_marker.id = 1;
-                    visualization_pub_.publish( sdf_marker );
-                }
+                // We pick a reasonable out-of-bounds value
+                const float oob_value = std::numeric_limits< float >::infinity();
+                // We start by extracting the SDF from the CollisionMap
+                sdf_ = collision_map.ExtractSignedDistanceField( oob_value ).first;
+                sdf_.Lock();
+
+                const double alpha = 0.5;
+                visualization_msgs::Marker sdf_marker = sdf_.ExportForDisplay( alpha );
+                sdf_marker.ns = "sdf";
+                sdf_marker.id = 1;
+
+                visualization_msgs::MarkerArray marker_array;
+                marker_array.markers = { collision_map_marker, sdf_marker };
+
+                visualization_pub_.publish( marker_array );
+
             }
 
             inline double getDistance( const geometry_msgs::Pose& pose ) const
@@ -190,10 +190,10 @@ namespace controls_project
             ////////////////////////////////////////////////////////////////////
 
             // Define the size of the grid
-            static constexpr double GRID_RESOLUTION = 0.20; // METERS
-            static constexpr double GRID_X_SIZE = 4.5;      // METERS
-            static constexpr double GRID_Y_SIZE = 4.5;      // METERS
-            static constexpr double GRID_Z_SIZE = 3.0;      // METERS
+            static constexpr double GRID_RESOLUTION = 0.02; // METERS
+            static constexpr double GRID_X_SIZE = 1.5;      // METERS
+            static constexpr double GRID_Y_SIZE = 1.5;      // METERS
+            static constexpr double GRID_Z_SIZE = 1.5;      // METERS
 
             sdf_tools::SignedDistanceField sdf_;
 
