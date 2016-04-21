@@ -15,6 +15,8 @@ set(CATKIN_PACKAGES
     moveit_msgs
     moveit_core
     moveit_ros_planning
+    tf
+    smmap_experiment_params
 )
 
 ## Find catkin macros and libraries

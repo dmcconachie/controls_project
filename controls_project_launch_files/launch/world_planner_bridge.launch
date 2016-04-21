@@ -1,0 +1,48 @@
+<launch>
+    <arg name="use_sim_time" default="false"/>
+
+    <!-- Mocap to TF bridge -->
+    <include file="$(find lightweight_vicon_bridge)/launch/vicon_bridge.launch">
+        <arg name="use_sim_time" value="$(arg use_sim_time)"/>
+    </include>
+
+    <!-- PR2 controllers -->
+    <include file="$(find archie_moveit_config)/launch/planning_context.launch">
+        <arg name="load_robot_description" value="true"/>
+    </include>
+
+    <node name="pr2_right_arm_cartesian_controller" pkg="pr2_cartesian_controller" type="cp_right_arm_controller" required="true">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+
+    <node name="pr2_left_arm_cartesian_controller" pkg="pr2_cartesian_controller" type="cp_left_arm_controller" required="true">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+
+    <!-- Transforms used to connect the table, kinect, and PR2 to the mocap world in the right way -->
+    <node pkg="tf" type="static_transform_publisher" name="kinect_broadcaster" required="true" args="0.004 0.041 -0.032 -0.5 0.5 -0.5 0.5 /mocap_Kinect2Block_Kinect2Block /Kinect2_ir_camera 100">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+    
+    <node pkg="tf" type="static_transform_publisher" name="pr2_simulation_mocap_to_odomcombined_broadcaster" required="true" args="0 0 0 0 0 0 /mocap_world /odom_combined 100">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+
+    <node pkg="tf" type="static_transform_publisher" name="table_mocap_marker_to_table_surface_broadcaster_bad_rotation" required="true" args="0.270 0.117 0.451 0.735, -0.072, 0.673, 0.027 /mocap_DalesAwesomeBox_DalesAwesomeBox /table_surface_bad_rotation 100">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+    
+    <node pkg="tf" type="static_transform_publisher" name="table_mocap_marker_to_table_surface_broadcaster" required="true" args="-.012 0.0 0.0 0.0 1.570796327 0.0 /table_surface_bad_rotation /table_surface 100">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+
+    <!-- Specific parameters for the table itself -->
+    <param name="table_surface_z" value="0.675"/>
+    <param name="table_x_size" value="0.6096"/>
+    <param name="table_y_size" value="0.5461"/>
+
+    <!-- Node to bridge between the world and the planner -->
+    <node name="smmap_synchronizer_node" pkg="synchronizer" type="synchronizer_node" required="true">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+</launch>

@@ -20,12 +20,36 @@
 #include <arc_utilities/eigen_helpers.hpp>
 #include <arc_utilities/eigen_helpers_conversions.hpp>
 #include <arc_utilities/pretty_print.hpp>
+#include <smmap_experiment_params/ros_params.hpp>
+
 #include "pr2_cartesian_controller/servoing_controller.hpp"
 
 using namespace pr2_mocap_servoing;
 
-MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::string group_name, std::string arm_pose_topic, std::string target_pose_topic, std::string arm_config_topic, std::string arm_command_action, std::string abort_service, double kp, double ki, double kd) : nh_(nh)
+MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::string group_name, std::string arm_pose_topic, std::string target_pose_topic, std::string arm_config_topic, std::string arm_command_action, std::string abort_service, double kp, double ki, double kd)
+    : nh_(nh)
+    , transform_listener_( nh_, ros::Duration( 20.0 ) )
 {
+    // Wait for tf to be ready
+    {
+        bool tf_ready = false;
+        do
+        {
+            tf::StampedTransform transform;
+            try
+            {
+                transform_listener_.lookupTransform( smmap::GetWorldFrameName(), "/torso_lift_link", ros::Time(0), transform );
+                tf_ready = true;
+            }
+            catch ( tf::TransformException ex )
+            {
+                ROS_WARN( "%s",ex.what() );
+                ros::Duration(1.0).sleep();
+            }
+        }
+        while ( ros::ok() && !tf_ready );
+    }
+
     // Set mode
     mode_ = INTERNAL_POSE;
     // Set up an internal robot model

@@ -17,6 +17,7 @@
 #include <geometry_msgs/PoseStamped.h>
 #include <pr2_controllers_msgs/JointTrajectoryControllerState.h>
 #include <pr2_controllers_msgs/JointTrajectoryAction.h>
+#include <tf/transform_listener.h>
 #include <actionlib/client/simple_action_client.h>
 #include <arc_utilities/eigen_helpers.hpp>
 #include <arc_utilities/pretty_print.hpp>
@@ -115,6 +116,8 @@ namespace pr2_mocap_servoing
         ros::Subscriber target_pose_sub_;
         ros::Subscriber arm_config_sub_;
 
+        tf::TransformListener transform_listener_;
+
         ros::Publisher arm_pose_pub_;
 
         ros::ServiceServer abort_server_;
@@ -127,20 +130,26 @@ namespace pr2_mocap_servoing
 
         inline void ArmPoseCB(geometry_msgs::PoseStamped arm_pose)
         {
-            // First, check to make sure the frame is correct (someday, we'll use TF to make this more general)
-            if (arm_pose.header.frame_id != std::string("/torso_lift_link") && arm_pose.header.frame_id != std::string("torso_lift_link"))
+            try
             {
-                ROS_ERROR("Invalid frame for arm pose update - pose must be in /torso_lift_link frame");
-            }
-            // If the pose is safe, handle it
-            else
-            {
+                // First, check to make sure the frame is correct (someday, we'll use TF to make this more general)
+                Eigen::Affine3d given_frame_to_torso_lift_link_frame( Eigen::Translation3d( 0, 0, 0 ) );
+                if (arm_pose.header.frame_id != std::string("/torso_lift_link") && arm_pose.header.frame_id != std::string("torso_lift_link"))
+                {
+                    tf::StampedTransform tf_transform;
+                    transform_listener_.lookupTransform( arm_pose.header.frame_id, "/torso_lift_link", ros::Time( 0.0 ), tf_transform );
+
+                    const Eigen::Translation3d translation( tf_transform.getOrigin().x(), tf_transform.getOrigin().y(), tf_transform.getOrigin().z() );
+                    const Eigen::Quaterniond rotation( tf_transform.getRotation().w(), tf_transform.getRotation().x(), tf_transform.getRotation().y(), tf_transform.getRotation().z() );
+                    given_frame_to_torso_lift_link_frame = translation * rotation;
+                }
+
                 // Convert to Eigen
-                Eigen::Translation3d translation(arm_pose.pose.position.x, arm_pose.pose.position.y, arm_pose.pose.position.z);
-                Eigen::Quaterniond rotation(arm_pose.pose.orientation.w, arm_pose.pose.orientation.x, arm_pose.pose.orientation.y, arm_pose.pose.orientation.z);
-                Pose new_arm_pose = translation * rotation;
+                const Eigen::Translation3d translation(arm_pose.pose.position.x, arm_pose.pose.position.y, arm_pose.pose.position.z);
+                const Eigen::Quaterniond rotation(arm_pose.pose.orientation.w, arm_pose.pose.orientation.x, arm_pose.pose.orientation.y, arm_pose.pose.orientation.z);
+                const Pose new_arm_pose = translation * rotation;
                 // Set the pose
-                current_arm_pose_ = new_arm_pose;
+                current_arm_pose_ = given_frame_to_torso_lift_link_frame.inverse() * new_arm_pose;
                 // Set the status
                 arm_pose_valid_ = true;
                 // Check and set global status
@@ -148,6 +157,13 @@ namespace pr2_mocap_servoing
                 // Reset watchdog timer
                 arm_pose_watchdog_ = nh_.createTimer(ros::Duration(watchdog_timeout_), &MocapServoingController::ArmPoseWatchdogCB, this, true);
             }
+            catch ( tf::TransformException ex )
+            {
+                (void)ex;
+                ROS_ERROR_STREAM( "Unable to lookup transform from " << arm_pose.header.frame_id << " to " << "/torso_lift_link" );
+                return;
+            }
+
         }
 
         inline void ArmPoseWatchdogCB(const ros::TimerEvent& e)
@@ -160,37 +176,52 @@ namespace pr2_mocap_servoing
 
         inline void TargetPoseCB(geometry_msgs::PoseStamped target_pose)
         {
-            // First, check to make sure the frame is correct (someday, we'll use TF to make this more general)
-            if (target_pose.header.frame_id != std::string("/torso_lift_link") && target_pose.header.frame_id != std::string("torso_lift_link"))
+            try
             {
-                ROS_ERROR("Invalid frame for target pose update - pose must be in /torso_lift_link frame");
+                // Check if the provided pose is a special "cancel target" message
+                if (target_pose.pose.orientation.x == 0.0 && target_pose.pose.orientation.y == 0.0 && target_pose.pose.orientation.z == 0.0 && target_pose.pose.orientation.w == 0.0)
+                {
+                    ROS_INFO("Cancelling pose target, switching to PAUSED mode");
+                    // Set the status
+                    target_pose_valid_ = false;
+                    // Check and set the global status
+                    RefreshGlobalStatus();
+                    // We don't reset the timer, instead we cancel it
+                    target_pose_watchdog_.stop();
+                }
+                else
+                {
+                    // First, check to make sure the frame is correct
+                    Eigen::Affine3d given_frame_to_torso_lift_link_frame( Eigen::Translation3d( 0, 0, 0 ) );
+                    if (target_pose.header.frame_id != std::string("/torso_lift_link") && target_pose.header.frame_id != std::string("torso_lift_link"))
+                    {
+                        tf::StampedTransform tf_transform;
+                        transform_listener_.lookupTransform( target_pose.header.frame_id, "/torso_lift_link", ros::Time( 0.0 ), tf_transform );
+
+                        const Eigen::Translation3d translation( tf_transform.getOrigin().x(), tf_transform.getOrigin().y(), tf_transform.getOrigin().z() );
+                        const Eigen::Quaterniond rotation( tf_transform.getRotation().w(), tf_transform.getRotation().x(), tf_transform.getRotation().y(), tf_transform.getRotation().z() );
+                        given_frame_to_torso_lift_link_frame = translation * rotation;
+                    }
+
+                    // Convert to Eigen
+                    Eigen::Translation3d translation(target_pose.pose.position.x, target_pose.pose.position.y, target_pose.pose.position.z);
+                    Eigen::Quaterniond rotation(target_pose.pose.orientation.w, target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z);
+                    Pose new_target_pose = translation * rotation;
+                    // Set the pose
+                    current_target_pose_ = given_frame_to_torso_lift_link_frame.inverse() * new_target_pose;
+                    // Set the status
+                    target_pose_valid_ = true;
+                    // Check and set global status
+                    RefreshGlobalStatus();
+                    // Reset watchdog timer
+                    target_pose_watchdog_ = nh_.createTimer(ros::Duration(watchdog_timeout_), &MocapServoingController::TargetPoseWatchdogCB, this, true);
+                }
             }
-            // Check if the provided pose is a special "cancel target" message
-            else if (target_pose.pose.orientation.x == 0.0 && target_pose.pose.orientation.y == 0.0 && target_pose.pose.orientation.z == 0.0 && target_pose.pose.orientation.w == 0.0)
+            catch ( tf::TransformException ex )
             {
-                ROS_INFO("Cancelling pose target, switching to PAUSED mode");
-                // Set the status
-                target_pose_valid_ = false;
-                // Check and set the global status
-                RefreshGlobalStatus();
-                // We don't reset the timer, instead we cancel it
-                target_pose_watchdog_.stop();
-            }
-            // If the pose is safe, handle it
-            else
-            {
-                // Convert to Eigen
-                Eigen::Translation3d translation(target_pose.pose.position.x, target_pose.pose.position.y, target_pose.pose.position.z);
-                Eigen::Quaterniond rotation(target_pose.pose.orientation.w, target_pose.pose.orientation.x, target_pose.pose.orientation.y, target_pose.pose.orientation.z);
-                Pose new_target_pose = translation * rotation;
-                // Set the pose
-                current_target_pose_ = new_target_pose;
-                // Set the status
-                target_pose_valid_ = true;
-                // Check and set global status
-                RefreshGlobalStatus();
-                // Reset watchdog timer
-                target_pose_watchdog_ = nh_.createTimer(ros::Duration(watchdog_timeout_), &MocapServoingController::TargetPoseWatchdogCB, this, true);
+                (void)ex;
+                ROS_ERROR_STREAM( "Unable to lookup transform from " << target_pose.header.frame_id << " to " << "/torso_lift_link" );
+                return;
             }
         }
 

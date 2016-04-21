@@ -1,31 +1,25 @@
 <launch>
     <arg name="logging_enabled" default="true"/>
-    <arg name="test_id" default=""/>
+    <arg name="test_id" default="pr2_trials"/>
     <arg name="deformability_override" default="0"/>
     <arg name="multi_model" default="0"/>
     <arg name="planning_horizion" default="1"/>
     <arg name="kalman_parameters_override" default="0"/>
     
     <include file="sim_world.launch"/>
-    
-    <node name="pr2_right_arm_cartesian_controller" pkg="pr2_cartesian_controller" type="cp_right_arm_controller" required="true"/>
-    <node name="pr2_left_arm_cartesian_controller" pkg="pr2_cartesian_controller" type="cp_left_arm_controller" required="true"/>
+    <include file="world_planner_bridge.launch"/> 
 
-    <!-- node pkg="tf" type="static_transform_publisher" name="kinect_broadcaster" args="0.004 0.041 -0.032 -0.5 0.5 -0.5 0.5 kinect_vicon kinect_camera 1" / -->
-    
-    <node name="smmap_synchronizer_node" pkg="synchronizer" type="synchronizer_node" required="true"/>
-    
-    <include file="$(find smmap)/launch/cloth_table_params.launch">
-        <arg name="logging_enabled" value="$(arg logging_enabled)"/>
-        <arg name="test_id" value="$(arg test_id)"/>
+    <include file="planner.launch">
+        <arg name="logging_enabled"             value="$(arg logging_enabled)"/>
+        <arg name="test_id"                     value="$(arg test_id)"/>
+        <arg name="deformability_override"      value="$(arg deformablity_override)"/>
+        <arg name="multi_model"                 value="$(arg multi_model)"/>
+        <arg name="planning_horizion"           value="$(arg planning_horizon)"/>
+        <arg name="kalman_parameters_override"  value="$(arg kalman_parameters_override)"/>
+        
+        <arg if="$(arg deformability_override)" name="translational_deformability" value="$(arg translational_deformability)"/>
+        <arg if="$(arg deformability_override)" name="rotational_deformability" value="$(arg rotational_deformability)"/>
+        <arg if="$(arg kalman_parameters_override)" name="process_noise_factor" value="$(arg process_noise_factor)"/>
+        <arg if="$(arg kalman_parameters_override)" name="observation_noise_factor" value="$(arg observation_noise_factor)"/>
     </include>
-    
-    <node name="smmap_planner_node" pkg="smmap" type="smmap_test_node" required="true">
-        <param name="use_multi_model" value="$(arg multi_model)" type="bool"/>
-        <param name="planning_horizion" value="$(arg planning_horizion)" type="int"/>
-        <param if="$(arg deformability_override)" name="translational_deformability" value="$(arg translational_deformability)"/>
-        <param if="$(arg deformability_override)" name="rotational_deformability" value="$(arg rotational_deformability)"/>
-        <param if="$(arg kalman_parameters_override)" name="process_noise_factor" value="$(arg process_noise_factor)"/>
-        <param if="$(arg kalman_parameters_override)" name="observation_noise_factor" value="$(arg observation_noise_factor)"/>
-    </node>
 </launch>

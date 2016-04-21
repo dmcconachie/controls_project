@@ -28,7 +28,7 @@ class Syncronizer
             , cmd_grippers_traj_goal_( nullptr )
             , gripper_names_( { "r_gripper", "l_gripper" } )
             , current_time_( 0.0 )
-            , table_frame_name_( GetTableTfFrameName( nh_ ) )
+            , table_frame_name_( GetTableFrameName() )
             , table_x_size_( GetTableSizeX( nh_ ) )
             , table_y_size_( GetTableSizeY( nh_ ) )
             , table_z_size_( GetTableSizeZ( nh_ ) )
@@ -39,11 +39,26 @@ class Syncronizer
             , cloth_config_( GetClothNumXAxisPoints( nh_ ) * GetClothNumYAxisPoints( nh_) )
             , actual_control_rate_( 40.0 * GetRobotControlPeriod( nh_ ) )
         {
-            // TODO: put delay in until transform_listener_ can find needed frames
+            // Wait for tf to be ready
+            {
+                bool tf_ready = false;
+                do
+                {
+                    tf::StampedTransform transform;
+                    try
+                    {
+                        transform_listener_.lookupTransform( GetWorldFrameName(), table_frame_name_, ros::Time(0), transform );
+                        tf_ready = true;
+                    }
+                    catch ( tf::TransformException ex )
+                    {
+                        ROS_WARN( "%s",ex.what() );
+                        ros::Duration(1.0).sleep();
+                    }
+                }
+                while ( ros::ok() && !tf_ready );
+            }
 
-            // Store the initial configuration as it will be needed by other libraries
-            // TODO: find a better way to do this that exposes less internals
-//                object_initial_configuration_ = ;
 
             ROS_INFO( "Creating subscribers and publishers" );
             // Publish to the feedback channel
@@ -198,7 +213,7 @@ class Syncronizer
             // Right gripper
             {
                 geometry_msgs::PoseStamped r_gripper_pose;
-                r_gripper_pose.header.frame_id = "world_frame";
+                r_gripper_pose.header.frame_id = GetWorldFrameName();
                 r_gripper_pose.pose = cmd_grippers_traj_goal_->trajectory[cmd_grippers_traj_next_index_].pose[0];
                 r_gripper_cmd_pub_.publish( r_gripper_pose );
             }
@@ -206,7 +221,7 @@ class Syncronizer
             // Left gripper
             {
                 geometry_msgs::PoseStamped l_gripper_pose;
-                l_gripper_pose.header.frame_id = "world_frame";
+                l_gripper_pose.header.frame_id = GetWorldFrameName();
                 l_gripper_pose.pose = cmd_grippers_traj_goal_->trajectory[cmd_grippers_traj_next_index_].pose[1];
                 l_gripper_cmd_pub_.publish( l_gripper_pose );
             }
@@ -355,12 +370,12 @@ class Syncronizer
             tf::StampedTransform tf_transform;
             try
             {
-                transform_listener_.lookupTransform( "/parent_frame", "/child_frame", ros::Time( 0.0 ), tf_transform );
+                transform_listener_.lookupTransform( GetWorldFrameName(), GetTableFrameName(), ros::Time( 0.0 ), tf_transform );
             }
             catch ( tf::TransformException ex )
             {
                 (void)ex;
-                ROS_ERROR( "Unable to lookup transform from /parent_frame to /child_frame" );
+                ROS_ERROR_STREAM( "Unable to lookup transform from " << GetWorldFrameName() << " to " << GetTableFrameName() );
 //                return false;
             }
             const Eigen::Translation3d translation( tf_transform.getOrigin().x(), tf_transform.getOrigin().y(), tf_transform.getOrigin().z() );

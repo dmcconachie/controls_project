@@ -11,11 +11,6 @@
     <!-- Spawn the pr2 into Gazebo -->
     <include file="$(find pr2_gazebo)/launch/pr2_no_controllers.launch" />
 
-    <!-- Load the urdf from the moveit files as well -->
-
-    <!-- Change to archie.srdf once it is available -->
-    <param name="robot_description_semantic" textfile="$(find archie_moveit_config)/config/pr2.srdf" />
-
     <!-- Create the controllers for the pr2 -->
     <include file="$(find pr2_controller_configuration_gazebo)/launch/pr2_default_controllers.launch" />
 </launch>
