@@ -13,4 +13,6 @@
 
     <!-- Create the controllers for the pr2 -->
     <include file="$(find pr2_controller_configuration_gazebo)/launch/pr2_default_controllers.launch"/>
+
+    <rosparam name="rviz/use_sim_time" type="bool" value="true" />
 </launch>
