@@ -19,28 +19,6 @@
         <param name="use_sim_time" value="$(arg use_sim_time)"/>
     </node>
 
-    <!-- Transforms used to connect the table, kinect, and PR2 to the mocap world in the right way -->
-    <!-- Note that when specifying orientation with 3 numbers, it's yaw pitch roll -->
-    <node pkg="tf" type="static_transform_publisher" name="kinect2_tf_broadcaster_intermediary" required="true" args="-0.005 0.055 -0.025 -0.007 0.0 -0.01 /mocap_Kinect2Block_Kinect2Block /kinect2_intermediary_frame 100">
-        <param name="use_sim_time" value="$(arg use_sim_time)"/>
-    </node>
-    
-    <node pkg="tf" type="static_transform_publisher" name="kinect2_tf_broadcaster" required="true" args="0 0 0 -0.5 0.5 -0.5 0.5 /kinect2_intermediary_frame /kinect2_ir_optical_frame 100">
-        <param name="use_sim_time" value="$(arg use_sim_time)"/>
-    </node>
-    
-    <node pkg="tf" type="static_transform_publisher" name="pr2_simulation_mocap_to_odomcombined_broadcaster" required="true" args="0 0 0 0 0 0 /mocap_world /odom_combined 100">
-        <param name="use_sim_time" value="$(arg use_sim_time)"/>
-    </node>
-
-    <node pkg="tf" type="static_transform_publisher" name="table_mocap_marker_to_table_surface_broadcaster_bad_rotation" required="true" args="0.270 0.117 0.464    -0.004, 0.033, -0.721, 0.692    /mocap_DalesAwesomeBox_DalesAwesomeBox /table_surface_bad_rotation 100">
-        <param name="use_sim_time" value="$(arg use_sim_time)"/>
-    </node>
-    
-    <node pkg="tf" type="static_transform_publisher" name="table_mocap_marker_to_table_surface_broadcaster" required="true" args="0 0 0         0.0071    0.0071    0.7071   -0.7071       /table_surface_bad_rotation /table_surface 100">
-        <param name="use_sim_time" value="$(arg use_sim_time)"/>
-    </node>
-
     <!-- Specific parameters for the table itself -->
     <param name="table_surface_z" value="0.675"/>
     <param name="table_x_size" value="0.6096"/>
