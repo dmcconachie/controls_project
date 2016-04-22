@@ -17,6 +17,7 @@ set(CATKIN_PACKAGES
     moveit_ros_planning
     tf
     smmap_experiment_params
+    kinematics_toolbox
 )
 
 ## Find catkin macros and libraries
@@ -141,10 +142,6 @@ add_library(servoing_controller
 )
 add_dependencies(servoing_controller ${catkin_EXPORTED_TARGETS})
 target_link_libraries(servoing_controller ${catkin_LIBRARIES})
-
-add_executable(right_arm_controller src/right_arm_controller.cpp)
-add_dependencies(right_arm_controller ${catkin_EXPORTED_TARGETS})
-target_link_libraries(right_arm_controller  ${catkin_LIBRARIES})
 
 add_executable(cp_left_arm_controller src/cp_left_arm_controller.cpp)
 add_dependencies(cp_left_arm_controller ${catkin_EXPORTED_TARGETS})

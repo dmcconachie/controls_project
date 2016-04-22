@@ -2,18 +2,24 @@
     <arg name="output" default="screen"/>
     <arg name="mocap_topic" default="/mocap_tracking"/>
     <arg name="mocap_frame_name" default="/mocap_world"/>
-    <arg name="left_arm_pose_topic" default="/l_arm_pose_controller/pose" />
-    <arg name="right_arm_pose_topic" default="/r_arm_pose_controller/pose" />
+    <arg name="left_arm_pose_topic" default="/l_arm_pose_controller/pose"/>
+    <arg name="right_arm_pose_topic" default="/r_arm_pose_controller/pose"/>
+    <arg name="use_sim_time" default="false"/>
 
     <!-- Kill the /robot_pose_ekf node running on the robot -->
-    <node pkg="mocap_robot_pose" type="kill_pr2_ekf.sh" name="kill_pr2_ekf" />
+    <node pkg="mocap_robot_pose" type="kill_pr2_ekf.sh" name="kill_pr2_ekf">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
 
     <node pkg="tf" type="static_transform_publisher" name="odom_to_mocap_link"
-        args="0 0 0 0 0 0 $(arg mocap_frame_name) /odom_combined 100"/>
+        args="0 0 0 0 0 0 $(arg mocap_frame_name) /odom_combined 100">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
 
     <node pkg="mocap_robot_pose" type="mocap_robot_base_pub" name="mocap_robot_base_pub" output="$(arg output)">
         <param name="mocap_topic" type="string" value="$(arg mocap_topic)" />
         <param name="robot_object_name" type="string" value="ArchieBase" />
         <param name="robot_segment_name" type="string" value="ArchieBase" />
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
     </node>
 </launch>

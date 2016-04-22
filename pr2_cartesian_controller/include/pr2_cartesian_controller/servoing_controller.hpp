@@ -97,6 +97,7 @@ namespace pr2_mocap_servoing
         std::unique_ptr<robot_model::JointModelGroup> pr2_arm_group_;
         std::unique_ptr<const robot_model::LinkModel> pr2_arm_link_;
         std::unique_ptr<const robot_model::LinkModel> pr2_torso_link_;
+        Eigen::Affine3d gripper_frame_to_wrist_roll_link_transform_;
 
         bool arm_pose_valid_;
         bool target_pose_valid_;
@@ -128,9 +129,9 @@ namespace pr2_mocap_servoing
         ros::Timer target_pose_watchdog_;
         ros::Timer arm_config_watchdog_;
 
-        void ArmPoseCB(geometry_msgs::PoseStamped arm_pose);
+//        void ArmPoseCB(geometry_msgs::PoseStamped arm_pose);
 
-        void ArmPoseWatchdogCB(const ros::TimerEvent& e);
+//        void ArmPoseWatchdogCB(const ros::TimerEvent& e);
 
         void TargetPoseCB(geometry_msgs::PoseStamped target_pose);
 
@@ -146,7 +147,7 @@ namespace pr2_mocap_servoing
 
         Eigen::MatrixXd ComputeJacobian(std::vector<double>& current_configuration);
 
-        Twist ComputePoseError(Pose& arm_pose, Pose& target_pose);
+//        Twist ComputePoseError(Pose& arm_pose, Pose& target_pose);
 
         void RefreshGlobalStatus();
 
