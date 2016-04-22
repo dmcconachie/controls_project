@@ -22,4 +22,12 @@
     <node pkg="tf" type="static_transform_publisher" name="table_mocap_marker_to_table_surface_broadcaster" required="true" args="0 0 0         0.0071    0.0071    0.7071   -0.7071       /table_surface_bad_rotation /table_surface 100">
         <param name="use_sim_time" value="$(arg use_sim_time)"/>
     </node>
+
+    <node pkg="tf" type="static_transform_publisher" name="l_wrist_to_closed_l_gripper_pads_broadcaster" required="true" args="0.182 0 0   0 0 0 /l_wrist_roll_link /l_gripper_frame 100">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+
+    <node pkg="tf" type="static_transform_publisher" name="r_wrist_to_closed_r_gripper_pads_broadcaster" required="true" args="0.182 0 0   0 0 0 /r_wrist_roll_link /r_gripper_frame 100">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
 </launch>
