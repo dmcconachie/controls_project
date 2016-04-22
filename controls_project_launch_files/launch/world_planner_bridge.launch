@@ -1,11 +1,6 @@
 <launch>
     <arg name="use_sim_time" default="false"/>
 
-    <!-- Mocap to TF bridge -->
-    <!-- include file="$(find lightweight_vicon_bridge)/launch/vicon_bridge.launch">
-        <arg name="use_sim_time" value="$(arg use_sim_time)"/>
-    </include -->
-
     <!-- PR2 controllers -->
     <include file="$(find archie_moveit_config)/launch/planning_context.launch">
         <arg name="load_robot_description" value="true"/>
@@ -26,11 +21,6 @@
 
     <!-- Node to bridge between the world and the planner -->
     <node name="smmap_synchronizer_node" pkg="synchronizer" type="synchronizer_node" required="true">
-        <param name="use_sim_time" value="$(arg use_sim_time)"/>
-    </node>
-
-    <!-- Node to retime kinect data in we are using sim time -->
-    <node name="kinect2_retimer" pkg="kinect2_retimer" type="kinect2_retimer_node" required="true">
         <param name="use_sim_time" value="$(arg use_sim_time)"/>
     </node>
 </launch>

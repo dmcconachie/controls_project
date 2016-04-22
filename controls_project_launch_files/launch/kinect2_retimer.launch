@@ -1,0 +1,6 @@
+<launch>
+    <!-- Node to retime kinect data in we are using sim time -->
+    <node name="kinect2_retimer" pkg="kinect2_retimer" type="kinect2_retimer_node" required="true">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+</launch>
