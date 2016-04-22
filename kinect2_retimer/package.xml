@@ -4,7 +4,7 @@
   <version>0.0.0</version>
   <description>The kinect2_retimer package</description>
 
-  <!-- One maintainer tag required, multiple allowed, one person per tag --> 
+  <!-- One maintainer tag required, multiple allowed, one person per tag -->
   <!-- Example:  -->
   <!-- <maintainer email="jane.doe@example.com">Jane Doe</maintainer> -->
   <maintainer email="pr2admin@todo.todo">pr2admin</maintainer>
@@ -40,10 +40,10 @@
   <!-- Use test_depend for packages you need only for testing: -->
   <!--   <test_depend>gtest</test_depend> -->
   <buildtool_depend>catkin</buildtool_depend>
-  <build_depend>kinect2_bridge</build_depend>
   <build_depend>roscpp</build_depend>
-  <run_depend>kinect2_bridge</run_depend>
+  <build_depend>sensor_msgs</build_depend>
   <run_depend>roscpp</run_depend>
+  <run_depend>sensor_msgs</run_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
