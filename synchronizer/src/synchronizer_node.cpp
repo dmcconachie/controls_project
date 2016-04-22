@@ -126,6 +126,8 @@ class Syncronizer
 
             while( ros::ok() )
             {
+                table_sdf_.publishCollisionMap();
+
                 // Check if we've been asked to follow a trajectory
                 if ( cmd_grippers_traj_as_.isNewGoalAvailable() )
                 {
