@@ -134,7 +134,7 @@ include_directories(include
 )
 
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3")
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -g -O3 -Wall -Wextra -Wpedantic -Wconversion")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++0x -g -O3 -Wall -Wextra -Wconversion")
 
 add_library(servoing_controller
     src/servoing_controller.cpp

@@ -91,6 +91,8 @@ MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::strin
         joint_names_[4] = "l_forearm_roll_joint";
         joint_names_[5] = "l_wrist_flex_joint";
         joint_names_[6] = "l_wrist_roll_joint";
+
+        default_config_ = { 0.46554443363374876, 0.25733775608375103, 0.9016356363484644, -0.36291338027676234, 0.9615921263791672, -0.7101873020292652, -6.297547394516469 };
     }
     else if (group_name == std::string("right_arm"))
     {
@@ -107,6 +109,8 @@ MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::strin
         joint_names_[4] = "r_forearm_roll_joint";
         joint_names_[5] = "r_wrist_flex_joint";
         joint_names_[6] = "r_wrist_roll_joint";
+
+        default_config_ = { -0.46554443363374876, 0.25733775608375103, -0.9016356363484644, -0.36291338027676234, -0.9615921263791672, -0.7101873020292652, -6.297547394516469 };
     }
     else
     {
@@ -451,8 +455,7 @@ void MocapServoingController::Loop()
         }
         else
         {
-            std::vector<double> target_config = { -5.8503660753217446e-05, -4.691989941019159e-05, -0.003717017512879117, -0.33096972617503706, 0.0005635499845348946, -0.47191914133014023, 4.367701055585371e-05 };
-            CommandToTarget(current_arm_config_, target_config);
+            CommandToTarget(current_arm_config_, default_config_);
         }
 
         // Process callbacks

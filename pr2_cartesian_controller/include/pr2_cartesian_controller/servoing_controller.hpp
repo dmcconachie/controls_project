@@ -105,6 +105,7 @@ namespace pr2_mocap_servoing
         Pose current_arm_pose_;
         Pose current_target_pose_;
         std::vector<double> current_arm_config_;
+        std::vector<double> default_config_;
 
         // Storage for PID control
         Twist pose_error_integral_;

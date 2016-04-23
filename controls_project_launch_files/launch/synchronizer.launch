@@ -1,0 +1,17 @@
+<launch>
+    <arg name="use_sim_time" default="false"/>
+
+    <!-- Specific parameters for the table itself -->
+    <param name="table_surface_z" value="0.675"/>
+    <param name="table_x_size" value="0.6096"/>
+    <param name="table_y_size" value="0.5461"/>
+
+    <!-- Specific parameters for the cloth -->
+    <param name="cloth_x_size" value="0.7493"/>
+    <param name="cloth_y_size" value="0.7239"/>
+
+    <!-- Node to bridge between the world and the planner -->
+    <node name="smmap_synchronizer_node" pkg="synchronizer" type="synchronizer_node" required="true">
+        <param name="use_sim_time" value="$(arg use_sim_time)"/>
+    </node>
+</launch>

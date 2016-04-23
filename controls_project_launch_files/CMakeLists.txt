@@ -6,8 +6,7 @@ project(controls_project_launch_files)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
   pr2_cartesian_controller
-  smmap
-  synchronizer
+  smmap_experiment_params
 )
 
 ## System dependencies are found with CMake's conventions
