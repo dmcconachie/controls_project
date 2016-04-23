@@ -6,11 +6,5 @@
     <include>
       <uri>model://sun</uri>
     </include>
-    <include>
-      <uri>model://table</uri>
-      <name>table_0</name>
-      <pose>0.5 0.0 -0.503 0 0 -1.5708</pose>
-      <ori
-    </include>
   </world>
 </sdf>

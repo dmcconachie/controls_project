@@ -11,7 +11,7 @@
         <param name="use_sim_time" value="$(arg use_sim_time)"/>
     </node>
     
-    <node pkg="tf" type="static_transform_publisher" name="pr2_simulation_mocap_to_odomcombined_broadcaster" required="true" args="0 0 0 0 0 0 /mocap_world /odom_combined 100">
+    <node pkg="tf" type="static_transform_publisher" name="pr2_simulation_mocap_to_odomcombined_broadcaster" required="true" args="0 0 0 0 0 0 /mocap_world /odom_combinded 100">
         <param name="use_sim_time" value="$(arg use_sim_time)"/>
     </node>
 

@@ -27,7 +27,7 @@
 #define TWIST_DOF 6
 
 // Set the level of debugging verbosity
-// #define VERBOSE_DEBUGGING
+#define VERBOSE_DEBUGGING
 
 // Set the "unit" maximum joint change/sec
 #define MAXIMUM_JOINT_VELOCITY 1.0
@@ -98,6 +98,7 @@ namespace pr2_mocap_servoing
         std::unique_ptr<const robot_model::LinkModel> pr2_arm_link_;
         std::unique_ptr<const robot_model::LinkModel> pr2_torso_link_;
         Eigen::Affine3d gripper_frame_to_wrist_roll_link_transform_;
+        Eigen::Affine3d world_to_torso_lift_link_transform_;
 
         bool arm_pose_valid_;
         bool target_pose_valid_;
@@ -146,6 +147,8 @@ namespace pr2_mocap_servoing
         Pose ComputeArmPose(std::vector<double>& current_configuration);
 
         Eigen::MatrixXd ComputeJacobian(std::vector<double>& current_configuration);
+
+        Eigen::MatrixXd weightedInverseKinematicsXd( const Eigen::MatrixXd& J,const std::vector< double >& theta, const double manipubility_threshold,const double damping_ratio );
 
 //        Twist ComputePoseError(Pose& arm_pose, Pose& target_pose);
 
