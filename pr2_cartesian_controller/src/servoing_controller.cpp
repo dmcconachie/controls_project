@@ -40,6 +40,9 @@ MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::strin
             {
                 tf::StampedTransform transform;
                 transform_listener_.lookupTransform( smmap::GetWorldFrameName(), "/torso_lift_link", ros::Time(0), transform );
+                const Eigen::Translation3d translation_w( transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z() );
+                const Eigen::Quaterniond rotation_w( transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z() );
+                world_to_torso_lift_link_transform_ = translation_w * rotation_w;
 
                 if (group_name == std::string("left_arm"))
                 {
@@ -53,10 +56,17 @@ MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::strin
                 {
                     throw std::invalid_argument("Invalid group name");
                 }
+                transform_listener_.lookupTransform( "/l_gripper_frame", "/l_wrist_roll_link", ros::Time(0), transform );
+
 
                 const Eigen::Translation3d translation( transform.getOrigin().x(), transform.getOrigin().y(), transform.getOrigin().z() );
                 const Eigen::Quaterniond rotation( transform.getRotation().w(), transform.getRotation().x(), transform.getRotation().y(), transform.getRotation().z() );
                 gripper_frame_to_wrist_roll_link_transform_ = translation * rotation;
+
+                // ROS_INFO_STREAM("gripper to wrist_roll: " << gripper_frame_to_wrist_roll_link_transform_.matrix() << "\n");
+
+                // exit(-1);
+
                 tf_ready = true;
             }
             catch ( tf::TransformException ex )
@@ -324,6 +334,7 @@ Pose MocapServoingController::ComputeArmPose(std::vector<double>& current_config
     // Update joint values
     pr2_kinematic_state_->setJointGroupPositions(pr2_arm_group_.get(), current_configuration);
     // Update the joint transforms
+    pr2_kinematic_state_->enforceBounds();
     pr2_kinematic_state_->update(true);
     // Get the transform from base to torso
     Pose current_base_to_torso_pose = pr2_kinematic_state_->getGlobalLinkTransform(pr2_torso_link_.get());
@@ -339,10 +350,64 @@ Eigen::MatrixXd MocapServoingController::ComputeJacobian(std::vector<double>& cu
     // Update joint values
     pr2_kinematic_state_->setJointGroupPositions(pr2_arm_group_.get(), current_configuration);
     // Update the joint transforms
+    pr2_kinematic_state_->enforceBounds();
     pr2_kinematic_state_->update(true);
     // Compute the Jacobian
     Eigen::MatrixXd current_jacobian = pr2_kinematic_state_->getJacobian(pr2_arm_group_.get());
     return current_jacobian;
+}
+
+Eigen::MatrixXd MocapServoingController::weightedInverseKinematicsXd( const Eigen::MatrixXd& J,
+                                          const std::vector< double >& theta,
+                                          const double manipubility_threshold,
+                                          const double damping_ratio )
+{
+    const ssize_t num_joints = (ssize_t)theta.size();
+    const ssize_t num_velocities = J.rows();
+
+    const kinematics::Matrix6d W_x = kinematics::Matrix6d::Identity();
+    Eigen::MatrixXd W_q = Eigen::MatrixXd::Identity( num_joints, num_joints );
+
+    W_q(0,0) = SHOULDER_PAN_DAMPING;
+    W_q(1,1) = SHOULDER_LIFT_DAMPING;
+    W_q(2,2) = UPPER_ARM_ROLL_DAMPING;
+    W_q(3,3) = ELBOW_FLEX_DAMPING;
+    W_q(4,4) = FOREARM_ROLL_DAMPING;
+    W_q(5,5) = WRIST_FLEX_DAMPING;
+    W_q(6,6) = WRIST_ROLL_DAMPING;
+
+    // Yes, this is ugly. This is to suppress a warning on type conversion related to Eigen operations
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wconversion"
+    const Eigen::MatrixXd J_w = W_x * J * W_q;
+    #pragma GCC diagnostic pop
+
+    // Yes, this is ugly. This is to suppress a warning on type conversion related to Eigen operations
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wconversion"
+    const kinematics::Matrix6d JwJwtranspose = J_w * J_w.transpose();
+    #pragma GCC diagnostic pop
+
+    // find the damping ratio
+    // Based on Manipulability, in 'Prior Work' of above paper
+    double manipubility = JwJwtranspose.determinant();
+#ifdef VERBOSE_DEBUGGING
+    std::cout << "Manipubility: " << manipubility << std::endl;
+#endif
+    double damping = 0;
+    if ( manipubility < manipubility_threshold )
+    {
+        damping = damping_ratio * std::pow( 1 - manipubility / manipubility_threshold, 2 );
+    }
+
+    const Eigen::MatrixXd tmp = JwJwtranspose + damping * Eigen::MatrixXd::Identity( num_velocities, num_velocities );
+    // Yes, this is ugly. This is to suppress a warning on type conversion related to Eigen operations
+    #pragma GCC diagnostic push
+    #pragma GCC diagnostic ignored "-Wconversion"
+    const Eigen::MatrixXd J_inv = J_w.transpose() * tmp.inverse();
+    #pragma GCC diagnostic pop
+
+    return W_q * J_inv * W_x;
 }
 
 //Twist MocapServoingController::ComputePoseError(Pose& arm_pose, Pose& target_pose)
@@ -407,13 +472,30 @@ std::vector<double> MocapServoingController::ComputeNextStep(Pose& current_arm_p
     // Use the Jacobian pseudoinverse
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wconversion"
-    Eigen::VectorXd joint_correction = EigenHelpers::Pinv(current_jacobian, EigenHelpers::SuggestedRcond()) * pose_correction;
+    Eigen::MatrixXd damped_jacobian = weightedInverseKinematicsXd( current_jacobian, current_arm_config_, 1e-3, 1e-2 );
+    Eigen::VectorXd joint_correction = damped_jacobian * pose_correction;
+
+    //Eigen::VectorXd joint_correction = EigenHelpers::Pinv(current_jacobian, EigenHelpers::SuggestedRcond()) * pose_correction;
     #pragma GCC diagnostic pop
+
+    //Eigen::VectorXd joint_correction = joint_velocities * CONTROL_INTERVAL;
 #ifdef VERBOSE_DEBUGGING
     std::cout << "Current raw joint correction: " << joint_correction << std::endl;
 #endif
+//    Eigen::VectorXd damped_joint_correction = joint_correction;
+//    damped_joint_correction[0] = damped_joint_correction[0] * SHOULDER_PAN_DAMPING;
+//    damped_joint_correction[1] = damped_joint_correction[1] * SHOULDER_LIFT_DAMPING;
+//    damped_joint_correction[2] = damped_joint_correction[2] * UPPER_ARM_ROLL_DAMPING;
+//    damped_joint_correction[3] = damped_joint_correction[3] * ELBOW_FLEX_DAMPING;
+//    damped_joint_correction[4] = damped_joint_correction[4] * FOREARM_ROLL_DAMPING;
+//    damped_joint_correction[5] = damped_joint_correction[5] * WRIST_FLEX_DAMPING;
+//    damped_joint_correction[6] = damped_joint_correction[6] * WRIST_ROLL_DAMPING;
+
     // Bound qdot to max magnitude of 0.05
     double joint_correction_magnitude = joint_correction.norm();
+#ifdef VERBOSE_DEBUGGING
+    std::cout << "Correction Magnitude: " << joint_correction_magnitude << std::endl;
+#endif
     if (joint_correction_magnitude > max_joint_correction_)
     {
         joint_correction = (joint_correction / joint_correction_magnitude) * max_joint_correction_;
@@ -423,13 +505,13 @@ std::vector<double> MocapServoingController::ComputeNextStep(Pose& current_arm_p
 #endif
     // Combine the joint correction with the current configuration to form the target configuration
     std::vector<double> target_configuration(PR2_ARM_JOINTS);
-    target_configuration[0] = current_configuration[0] + (joint_correction[0] * SHOULDER_PAN_DAMPING) + SHOULDER_PAN_OFFSET;
-    target_configuration[1] = current_configuration[1] + (joint_correction[1] * SHOULDER_LIFT_DAMPING) + SHOULDER_LIFT_OFFSET;
-    target_configuration[2] = current_configuration[2] + (joint_correction[2] * UPPER_ARM_ROLL_DAMPING) + UPPER_ARM_ROLL_OFFSET;
-    target_configuration[3] = current_configuration[3] + (joint_correction[3] * ELBOW_FLEX_DAMPING) + ELBOW_FLEX_OFFSET;
-    target_configuration[4] = current_configuration[4] + (joint_correction[4] * FOREARM_ROLL_DAMPING) + FOREARM_ROLL_OFFSET;
-    target_configuration[5] = current_configuration[5] + (joint_correction[5] * WRIST_FLEX_DAMPING) + WRIST_FLEX_OFFSET;
-    target_configuration[6] = current_configuration[6] + (joint_correction[6] * WRIST_ROLL_DAMPING) + WRIST_ROLL_OFFSET;
+    target_configuration[0] = current_configuration[0] + joint_correction[0] + SHOULDER_PAN_OFFSET;
+    target_configuration[1] = current_configuration[1] + joint_correction[1] + SHOULDER_LIFT_OFFSET;
+    target_configuration[2] = current_configuration[2] + joint_correction[2] + UPPER_ARM_ROLL_OFFSET;
+    target_configuration[3] = current_configuration[3] + joint_correction[3] + ELBOW_FLEX_OFFSET;
+    target_configuration[4] = current_configuration[4] + joint_correction[4] + FOREARM_ROLL_OFFSET;
+    target_configuration[5] = current_configuration[5] + joint_correction[5] + WRIST_FLEX_OFFSET;
+    target_configuration[6] = current_configuration[6] + joint_correction[6] + WRIST_ROLL_OFFSET;
 #ifdef VERBOSE_DEBUGGING
     std::cout << "Current configuration: " << PrettyPrint::PrettyPrint(current_configuration, true) << std::endl;
     std::cout << "New target configuration: " << PrettyPrint::PrettyPrint(target_configuration, true) << std::endl;
@@ -443,13 +525,15 @@ void MocapServoingController::Loop()
     while (ros::ok())
     {
         geometry_msgs::PoseStamped pose;
-        pose.pose = EigenHelpersConversions::EigenAffine3dToGeometryPose(current_arm_pose_ * gripper_frame_to_wrist_roll_link_transform_.inverse());
+        pose.header.frame_id=smmap::GetWorldFrameName();
+        pose.pose = EigenHelpersConversions::EigenAffine3dToGeometryPose( world_to_torso_lift_link_transform_ * current_arm_pose_ * gripper_frame_to_wrist_roll_link_transform_.inverse());
         arm_pose_pub_.publish(pose);
         // Do the next step
         if (state_ == RUNNING)
         {
             // Compute the next step
             std::vector<double> target_config = ComputeNextStep(current_arm_pose_, current_target_pose_, current_arm_config_);
+            // std::vector<double> target_config = { -5.8503660753217446e-05, -4.691989941019159e-05, -0.003717017512879117, 1.57, 0.0005635499845348946, -0.47191914133014023, 4.367701055585371e-05 };
             // Command the robot
             CommandToTarget(current_arm_config_, target_config);
         }
