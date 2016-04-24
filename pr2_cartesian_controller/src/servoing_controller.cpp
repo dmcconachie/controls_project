@@ -158,52 +158,6 @@ MocapServoingController::MocapServoingController(ros::NodeHandle &nh, std::strin
     state_ = PAUSED;
 }
 
-//void MocapServoingController::ArmPoseCB(geometry_msgs::PoseStamped arm_pose)
-//{
-//    try
-//    {
-//        // First, check to make sure the frame is correct (someday, we'll use TF to make this more general)
-//        Eigen::Affine3d given_frame_to_torso_lift_link_frame( Eigen::Translation3d( 0, 0, 0 ) );
-//        if (arm_pose.header.frame_id != std::string("/torso_lift_link") && arm_pose.header.frame_id != std::string("torso_lift_link"))
-//        {
-//            tf::StampedTransform tf_transform;
-//            transform_listener_.lookupTransform( arm_pose.header.frame_id, "/torso_lift_link", ros::Time( 0.0 ), tf_transform );
-
-//            const Eigen::Translation3d translation( tf_transform.getOrigin().x(), tf_transform.getOrigin().y(), tf_transform.getOrigin().z() );
-//            const Eigen::Quaterniond rotation( tf_transform.getRotation().w(), tf_transform.getRotation().x(), tf_transform.getRotation().y(), tf_transform.getRotation().z() );
-//            given_frame_to_torso_lift_link_frame = translation * rotation;
-//        }
-
-//        // Convert to Eigen
-//        const Eigen::Translation3d translation(arm_pose.pose.position.x, arm_pose.pose.position.y, arm_pose.pose.position.z);
-//        const Eigen::Quaterniond rotation(arm_pose.pose.orientation.w, arm_pose.pose.orientation.x, arm_pose.pose.orientation.y, arm_pose.pose.orientation.z);
-//        const Pose new_arm_pose = translation * rotation;
-//        // Set the pose
-//        current_arm_pose_ = given_frame_to_torso_lift_link_frame.inverse() * new_arm_pose;
-//        // Set the status
-//        arm_pose_valid_ = true;
-//        // Check and set global status
-//        RefreshGlobalStatus();
-//        // Reset watchdog timer
-//        arm_pose_watchdog_ = nh_.createTimer(ros::Duration(watchdog_timeout_), &MocapServoingController::ArmPoseWatchdogCB, this, true);
-//    }
-//    catch ( tf::TransformException ex )
-//    {
-//        (void)ex;
-//        ROS_ERROR_STREAM( "Unable to lookup transform from " << arm_pose.header.frame_id << " to " << "/torso_lift_link" );
-//        return;
-//    }
-
-//}
-
-//void MocapServoingController::ArmPoseWatchdogCB(const ros::TimerEvent& e)
-//{
-//    (void)e;
-//    ROS_WARN("Arm pose hasn't been updated in %f seconds - pausing execution until a new pose update received", watchdog_timeout_);
-//    arm_pose_valid_ = false;
-//    state_ = PAUSED;
-//}
-
 void MocapServoingController::TargetPoseCB(geometry_msgs::PoseStamped target_pose)
 {
     try
@@ -368,13 +322,13 @@ Eigen::MatrixXd MocapServoingController::weightedInverseKinematicsXd( const Eige
     const kinematics::Matrix6d W_x = kinematics::Matrix6d::Identity();
     Eigen::MatrixXd W_q = Eigen::MatrixXd::Identity( num_joints, num_joints );
 
-    W_q(0,0) = SHOULDER_PAN_DAMPING;
-    W_q(1,1) = SHOULDER_LIFT_DAMPING;
-    W_q(2,2) = UPPER_ARM_ROLL_DAMPING;
-    W_q(3,3) = ELBOW_FLEX_DAMPING;
-    W_q(4,4) = FOREARM_ROLL_DAMPING;
-    W_q(5,5) = WRIST_FLEX_DAMPING;
-    W_q(6,6) = WRIST_ROLL_DAMPING;
+    W_q(0,0) = 1./SHOULDER_PAN_DAMPING;
+    W_q(1,1) = 1./SHOULDER_LIFT_DAMPING;
+    W_q(2,2) = 1./UPPER_ARM_ROLL_DAMPING;
+    W_q(3,3) = 1./ELBOW_FLEX_DAMPING;
+    W_q(4,4) = 1./FOREARM_ROLL_DAMPING;
+    W_q(5,5) = 1./WRIST_FLEX_DAMPING;
+    W_q(6,6) = 1./WRIST_ROLL_DAMPING;
 
     // Yes, this is ugly. This is to suppress a warning on type conversion related to Eigen operations
     #pragma GCC diagnostic push
@@ -398,6 +352,9 @@ Eigen::MatrixXd MocapServoingController::weightedInverseKinematicsXd( const Eige
     if ( manipubility < manipubility_threshold )
     {
         damping = damping_ratio * std::pow( 1 - manipubility / manipubility_threshold, 2 );
+
+        std::cout << "Damping the pseudoinverse with value " << damping << std::endl;
+        std::cout << "Jw * Jw_transpose:\n" << JwJwtranspose << std::endl;
     }
 
     const Eigen::MatrixXd tmp = JwJwtranspose + damping * Eigen::MatrixXd::Identity( num_velocities, num_velocities );
@@ -409,22 +366,6 @@ Eigen::MatrixXd MocapServoingController::weightedInverseKinematicsXd( const Eige
 
     return W_q * J_inv * W_x;
 }
-
-//Twist MocapServoingController::ComputePoseError(Pose& arm_pose, Pose& target_pose)
-//{
-//#ifdef VERBOSE_DEBUGGING
-//    std::cout << "Current arm pose:\n" << arm_pose.translation() << std::endl;
-//    std::cout << "Current target pose:\n" << target_pose.translation() << std::endl;
-//#endif
-//    Twist pose_error;
-//    pose_error.head<3>() = arm_pose.translation() - target_pose.translation();
-//    pose_error.tail<3>() = 0.5 * (target_pose.linear().col(0).cross(arm_pose.linear().col(0)) + target_pose.linear().col(1).cross(arm_pose.linear().col(1)) + target_pose.linear().col(2).cross(arm_pose.linear().col(2)));
-//    pose_error = -1.0 * pose_error;
-//#ifdef VERBOSE_DEBUGGING
-//    std::cout << "Computed pose error:\n" << pose_error << std::endl;
-//#endif
-//    return pose_error;
-//}
 
 void MocapServoingController::RefreshGlobalStatus()
 {
@@ -456,11 +397,14 @@ std::vector<double> MocapServoingController::ComputeNextStep(Pose& current_arm_p
 {
     // Get the current jacobian
     Eigen::MatrixXd current_jacobian = ComputeJacobian(current_configuration);
-#ifdef VERBOSE_DEBUGGING
-    std::cout << "Current Jacobian: " << current_jacobian << std::endl;
-#endif
     // Compute the pose error in our 'world frame'
     Twist pose_error =  kinematics::calculateError( current_arm_pose, current_target_pose );  // ComputePoseError(current_arm_pose, current_target_pose);
+
+    std::cout << "target:\n" << current_arm_pose.matrix() << std::endl;
+    std::cout << "current:\n" << current_target_pose.matrix() << std::endl;
+
+    std::cout << "pose error:\n" << pose_error.transpose() << std::endl;
+
     // Compute the integral of pose error & update the stored value
     pose_error_integral_ = pose_error_integral_ + (pose_error * CONTROL_INTERVAL);
     // Compute the derivative of pose error
@@ -469,18 +413,21 @@ std::vector<double> MocapServoingController::ComputeNextStep(Pose& current_arm_p
     last_pose_error_ = pose_error;
     // Convert pose errors into cartesian velocity
     Twist pose_correction = (pose_error * kp_) + (pose_error_integral_ * ki_) + (pose_error_derivative * kd_);
+    std::cout << "pose correction:\n" << pose_correction.transpose() << std::endl << std::endl;
+
+
     // Use the Jacobian pseudoinverse
     #pragma GCC diagnostic push
     #pragma GCC diagnostic ignored "-Wconversion"
-    Eigen::MatrixXd damped_jacobian = weightedInverseKinematicsXd( current_jacobian, current_arm_config_, 1e-3, 1e-2 );
-    Eigen::VectorXd joint_correction = damped_jacobian * pose_correction;
+    Eigen::MatrixXd damped_pseudo_inverse = weightedInverseKinematicsXd( current_jacobian, current_arm_config_, 1e-3, 1e-2 );
+    Eigen::VectorXd joint_correction = damped_pseudo_inverse * pose_correction;
 
     //Eigen::VectorXd joint_correction = EigenHelpers::Pinv(current_jacobian, EigenHelpers::SuggestedRcond()) * pose_correction;
     #pragma GCC diagnostic pop
 
     //Eigen::VectorXd joint_correction = joint_velocities * CONTROL_INTERVAL;
 #ifdef VERBOSE_DEBUGGING
-    std::cout << "Current raw joint correction: " << joint_correction << std::endl;
+    std::cout << "Current raw joint correction:\n" << joint_correction.transpose() << std::endl;
 #endif
 //    Eigen::VectorXd damped_joint_correction = joint_correction;
 //    damped_joint_correction[0] = damped_joint_correction[0] * SHOULDER_PAN_DAMPING;
@@ -501,7 +448,7 @@ std::vector<double> MocapServoingController::ComputeNextStep(Pose& current_arm_p
         joint_correction = (joint_correction / joint_correction_magnitude) * max_joint_correction_;
     }
 #ifdef VERBOSE_DEBUGGING
-    std::cout << "Current limited joint correction: " << joint_correction << std::endl;
+    std::cout << "Current limited joint correction:\n" << joint_correction.transpose() << std::endl;
 #endif
     // Combine the joint correction with the current configuration to form the target configuration
     std::vector<double> target_configuration(PR2_ARM_JOINTS);
@@ -513,9 +460,11 @@ std::vector<double> MocapServoingController::ComputeNextStep(Pose& current_arm_p
     target_configuration[5] = current_configuration[5] + joint_correction[5] + WRIST_FLEX_OFFSET;
     target_configuration[6] = current_configuration[6] + joint_correction[6] + WRIST_ROLL_OFFSET;
 #ifdef VERBOSE_DEBUGGING
-    std::cout << "Current configuration: " << PrettyPrint::PrettyPrint(current_configuration, true) << std::endl;
+    std::cout << "Current configuration:    " << PrettyPrint::PrettyPrint(current_configuration, true) << std::endl;
     std::cout << "New target configuration: " << PrettyPrint::PrettyPrint(target_configuration, true) << std::endl;
 #endif
+
+    std::cout << std::endl << std::endl;
     return target_configuration;
 }
 
@@ -537,9 +486,9 @@ void MocapServoingController::Loop()
             // Command the robot
             CommandToTarget(current_arm_config_, target_config);
         }
-        else
+        else if (current_arm_config_.size() == PR2_ARM_JOINTS)
         {
-            CommandToTarget(current_arm_config_, default_config_);
+            CommandToTarget(current_arm_config_, current_arm_config_);
         }
 
         // Process callbacks

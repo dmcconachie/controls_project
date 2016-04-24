@@ -1,16 +1,19 @@
 <launch>
     <arg name="use_sim_time" default="false"/>
+    <arg name="kp" default="1.0"/>
 
     <!-- PR2 controllers -->
     <include file="$(find archie_moveit_config)/launch/planning_context.launch">
         <arg name="load_robot_description" value="true"/>
     </include>
 
-    <node name="pr2_right_arm_cartesian_controller" pkg="pr2_cartesian_controller" type="cp_right_arm_controller" required="true">
+    <node name="pr2_right_arm_cartesian_controller" pkg="pr2_cartesian_controller" type="cp_right_arm_controller" required="true" output="log">
         <param name="use_sim_time" value="$(arg use_sim_time)"/>
+        <param name="kp" value="$(arg kp)"/>
     </node>
 
-    <node name="pr2_left_arm_cartesian_controller" pkg="pr2_cartesian_controller" type="cp_left_arm_controller" required="true">
+    <node name="pr2_left_arm_cartesian_controller" pkg="pr2_cartesian_controller" type="cp_left_arm_controller" required="true" output="screen">
         <param name="use_sim_time" value="$(arg use_sim_time)"/>
+        <param name="kp" value="$(arg kp)"/>
     </node>
 </launch>

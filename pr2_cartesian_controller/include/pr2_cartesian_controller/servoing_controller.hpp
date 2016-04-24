@@ -30,7 +30,7 @@
 #define VERBOSE_DEBUGGING
 
 // Set the "unit" maximum joint change/sec
-#define MAXIMUM_JOINT_VELOCITY 1.0
+#define MAXIMUM_JOINT_VELOCITY 0.1
 // Set the control rate
 #define CONTROL_RATE 5.0
 // From the control rate, set the other core operating values
