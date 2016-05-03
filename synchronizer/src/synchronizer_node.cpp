@@ -1,7 +1,6 @@
 #include <mutex>
 #include <thread>
 
-#include <Eigen/StdVector> // Hack around typedef/partial spec problem in arc_utilities/sdf_tools
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
 #include <tf/transform_listener.h>
